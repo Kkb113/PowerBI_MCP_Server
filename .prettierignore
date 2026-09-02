@@ -1,0 +1,6 @@
+coverage/
+dist/
+node_modules/
+powerbi-mcp/
+.npm-cache/
+package-lock.json

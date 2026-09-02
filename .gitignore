@@ -1,0 +1,21 @@
+powerbi-mcp/
+
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+.npm-cache/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+
+# Logs and temporary files
+*.log
+*.tmp
+.DS_Store
+
+# Editors
+.idea/
+.vscode/

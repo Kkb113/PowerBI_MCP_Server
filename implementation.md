@@ -1,6 +1,6 @@
 # TypeScript Fabric Semantic Model MCP Server — Six-Phase Implementation Plan
 
-> Status: Phase 1 implemented on 2026-09-02. Phases 2-6 remain planned and are not implemented.
+> Status: Phases 1-3 implemented on 2026-09-02. Phases 4-6 remain planned and are not implemented.
 >
 > Research date: 2026-09-02
 
@@ -308,6 +308,14 @@ Provide one well-tested boundary around Microsoft authentication and HTTP behavi
 
 ### Phase 3 — Typed semantic-model definition and CRUD engine
 
+#### Implementation status
+
+Implemented on 2026-09-02. The strict `ModelSpec` and supported TMSL schemas, deterministic
+normalization and hashing, semantic diff, dependency reporting, DAX reference/lint utilities,
+definition-part codec, and atomic in-memory CRUD transaction engine are covered by unit and local
+end-to-end tests. The Phase 3 engine performs no Fabric writes and is not connected to the MCP
+handlers; that service orchestration belongs to Phase 4.
+
 #### Objective
 
 Build the deterministic in-memory model layer that makes full-definition updates safe.
@@ -339,6 +347,14 @@ Build the deterministic in-memory model layer that makes full-definition updates
 - Serialization and hashes are deterministic across repeated runs.
 - Golden tests cover apostrophes, spaces, Unicode, multiline DAX/M, calculation groups, composite keys where supported, and invalid references.
 - No live Fabric model is mutated yet.
+
+The first supported TMSL subset uses `singleColumn` relationships. Composite relationship payloads
+are therefore rejected; a source model that needs a compound business key must expose a supported
+surrogate key or remain outside this release's contract. Fabric annotations, lineage tags, and
+common column metadata are retained through the canonical model. Other unsupported `model.bim`
+fields are rejected at the codec boundary instead of being silently dropped. This is intentionally
+narrower than the full TMSL language and protects full-definition updates until additional fields
+have an explicit lossless mapping.
 
 ### Phase 4 — Fabric semantic-model lifecycle and safe live mutations
 
@@ -532,6 +548,11 @@ Deployment is intentionally outside the six implementation phases. Phase 6 only 
 - [Official MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
 - [MCP TypeScript server guide](https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/server.md)
 - [Fabric semantic model definition formats](https://learn.microsoft.com/en-us/rest/api/fabric/articles/item-management/definitions/semantic-model-definition)
+- [Tabular Model Scripting Language reference](https://learn.microsoft.com/en-us/analysis-services/tmsl/tabular-model-scripting-language-tmsl-reference)
+- [TMSL model object](https://learn.microsoft.com/en-us/analysis-services/tmsl/model-object-tmsl)
+- [TMSL partition objects](https://learn.microsoft.com/en-us/analysis-services/tmsl/partitions-object-tmsl)
+- [TMSL relationship objects](https://learn.microsoft.com/en-us/analysis-services/tmsl/relationships-object-tmsl)
+- [TMSL role objects](https://learn.microsoft.com/en-us/analysis-services/tmsl/roles-object-tmsl)
 - [Create a semantic model](https://learn.microsoft.com/en-us/rest/api/fabric/semanticmodel/items/create-semantic-model)
 - [Get a semantic model definition](https://learn.microsoft.com/en-us/rest/api/fabric/semanticmodel/items/get-semantic-model-definition)
 - [Update a semantic model definition](https://learn.microsoft.com/en-us/rest/api/fabric/semanticmodel/items/update-semantic-model-definition)

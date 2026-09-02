@@ -1,0 +1,418 @@
+{
+  "compatibilityLevel": 1702,
+  "model": {
+    "culture": "en-US",
+    "sourceQueryCulture": "en-US",
+    "description": "Phase 3 semantic-model fixture",
+    "defaultPowerBIDataSourceVersion": "powerBI_V3",
+    "discourageImplicitMeasures": true,
+    "dataAccessOptions": {
+      "legacyRedirects": true,
+      "returnErrorValuesAsNull": true
+    },
+    "cultures": [],
+    "functions": [],
+    "perspectives": [],
+    "dataSources": [
+      {
+        "type": "structured",
+        "name": "Warehouse Source",
+        "description": "Non-secret connection metadata only.",
+        "connectionDetails": {
+          "protocol": "tds",
+          "address": {
+            "server": "example.datawarehouse.fabric.microsoft.com",
+            "database": "SalesWarehouse"
+          }
+        },
+        "options": {
+          "commandTimeout": 120
+        },
+        "annotations": [
+          {
+            "name": "FixtureSource",
+            "value": "Phase3"
+          }
+        ]
+      }
+    ],
+    "expressions": [
+      {
+        "name": "Parameter – Server",
+        "kind": "m",
+        "expression": [
+          "let",
+          "    Value = \"example.datawarehouse.fabric.microsoft.com\"",
+          "in",
+          "    Value"
+        ],
+        "description": "Unicode and multiline M fixture.",
+        "annotations": []
+      }
+    ],
+    "tables": [
+      {
+        "name": "Calendar",
+        "description": "Date dimension",
+        "isHidden": false,
+        "columns": [
+          {
+            "type": "data",
+            "name": "Date",
+            "sourceColumn": "Date",
+            "dataType": "dateTime",
+            "formatString": "yyyy-MM-dd",
+            "isHidden": false,
+            "isKey": true,
+            "summarizeBy": "none",
+            "annotations": []
+          },
+          {
+            "type": "calculated",
+            "name": "Year",
+            "expression": "YEAR([Date])",
+            "dataType": "int64",
+            "isHidden": false,
+            "summarizeBy": "none",
+            "annotations": []
+          },
+          {
+            "type": "calculated",
+            "name": "Month Name",
+            "expression": "FORMAT([Date], \"MMMM\")",
+            "dataType": "string",
+            "isHidden": false,
+            "sortByColumn": "Month Number",
+            "summarizeBy": "none",
+            "annotations": []
+          },
+          {
+            "type": "calculated",
+            "name": "Month Number",
+            "expression": "MONTH([Date])",
+            "dataType": "int64",
+            "isHidden": true,
+            "summarizeBy": "none",
+            "annotations": []
+          }
+        ],
+        "partitions": [
+          {
+            "name": "Calendar",
+            "mode": "import",
+            "source": {
+              "type": "calculated",
+              "expression": "CALENDAR(DATE(2024, 1, 1), DATE(2026, 12, 31))"
+            },
+            "annotations": []
+          }
+        ],
+        "measures": [],
+        "hierarchies": [
+          {
+            "name": "Calendar Hierarchy",
+            "description": "Order is significant.",
+            "isHidden": false,
+            "levels": [
+              {
+                "name": "Year",
+                "column": "Year",
+                "ordinal": 0
+              },
+              {
+                "name": "Month",
+                "column": "Month Name",
+                "ordinal": 1
+              },
+              {
+                "name": "Day",
+                "column": "Date",
+                "ordinal": 2
+              }
+            ],
+            "annotations": []
+          }
+        ],
+        "annotations": []
+      },
+      {
+        "name": "Customer's",
+        "description": "Apostrophe quoting fixture",
+        "isHidden": false,
+        "columns": [
+          {
+            "name": "Customer ID",
+            "sourceColumn": "CustomerId",
+            "dataType": "int64",
+            "isHidden": false,
+            "isKey": true,
+            "summarizeBy": "none",
+            "annotations": []
+          },
+          {
+            "name": "Region",
+            "sourceColumn": "Region",
+            "dataType": "string",
+            "isHidden": false,
+            "isKey": false,
+            "summarizeBy": "none",
+            "annotations": []
+          }
+        ],
+        "partitions": [
+          {
+            "name": "Customer Query",
+            "mode": "import",
+            "source": {
+              "type": "m",
+              "expression": [
+                "let",
+                "    Source = #table({\"CustomerId\", \"Region\"}, {{1, \"West\"}})",
+                "in",
+                "    Source"
+              ]
+            },
+            "annotations": []
+          }
+        ],
+        "measures": [],
+        "hierarchies": [],
+        "annotations": []
+      },
+      {
+        "name": "Product",
+        "description": "Direct Lake entity partition fixture",
+        "isHidden": false,
+        "columns": [
+              {
+                "name": "Product ID",
+                "sourceColumn": "ProductId",
+                "dataType": "int64",
+                "isDefaultLabel": true,
+                "isHidden": false,
+            "isKey": true,
+            "summarizeBy": "none",
+            "annotations": []
+          }
+        ],
+        "partitions": [
+          {
+            "name": "Product Entity",
+            "mode": "directLake",
+            "source": {
+              "type": "entity",
+              "entityName": "DimProduct",
+              "schemaName": "dbo",
+              "dataSource": "Warehouse Source"
+            },
+            "annotations": []
+          }
+        ],
+        "measures": [],
+        "hierarchies": [],
+        "annotations": []
+      },
+      {
+            "name": "Sales Data",
+            "description": "Fact table",
+            "isHidden": false,
+            "lineageTag": "7ef87eca-9e07-4dd8-960c-2b95898d4377",
+        "columns": [
+          {
+            "name": "Order ID",
+            "sourceColumn": "OrderId",
+            "dataType": "int64",
+            "isHidden": false,
+            "isKey": true,
+            "summarizeBy": "none",
+            "annotations": []
+          },
+          {
+            "name": "Order Date",
+            "sourceColumn": "OrderDate",
+            "dataType": "dateTime",
+            "isHidden": false,
+            "isKey": false,
+            "summarizeBy": "none",
+            "annotations": []
+          },
+          {
+            "name": "Customer ID",
+            "sourceColumn": "CustomerId",
+            "dataType": "int64",
+            "isHidden": false,
+            "isKey": false,
+            "summarizeBy": "none",
+            "annotations": []
+          },
+          {
+            "name": "Product ID",
+            "sourceColumn": "ProductId",
+            "dataType": "int64",
+            "isHidden": false,
+            "isKey": false,
+            "summarizeBy": "none",
+            "annotations": []
+          },
+          {
+            "name": "Amount",
+            "sourceColumn": "Amount",
+                "dataType": "decimal",
+                "formatString": "$#,0.00",
+                "isAvailableInMdx": false,
+                "isHidden": false,
+                "isKey": false,
+                "summarizeBy": "sum",
+                "lineageTag": "58ab9571-fbd4-47cc-adac-0dc7d97dcf42",
+                "annotations": []
+          }
+        ],
+        "partitions": [
+          {
+            "name": "Sales Query",
+            "mode": "import",
+            "source": {
+              "type": "query",
+              "query": "SELECT OrderId, OrderDate, CustomerId, ProductId, Amount FROM dbo.FactSales",
+              "dataSource": "Warehouse Source"
+            },
+            "annotations": []
+          }
+        ],
+        "measures": [
+          {
+            "name": "Revenue Δ",
+            "expression": [
+              "SUM(",
+              "    'Sales Data'[Amount]",
+              ")"
+            ],
+            "description": "Total revenue with a Unicode measure name.",
+            "displayFolder": "Core Metrics",
+            "formatString": "$#,0.00;($#,0.00);$0.00",
+            "isHidden": false,
+            "lineageTag": "1f8f1a2a-06b6-4989-8af7-212719cf3617",
+            "annotations": []
+          },
+          {
+            "name": "Average Ticket",
+            "expression": "DIVIDE([Revenue Δ], DISTINCTCOUNT('Sales Data'[Order ID]))",
+            "description": "Average revenue per order.",
+            "displayFolder": "Core Metrics",
+            "formatString": "$#,0.00",
+            "isHidden": false,
+            "annotations": []
+          }
+        ],
+        "hierarchies": [],
+        "annotations": []
+      },
+      {
+        "name": "Time Intelligence",
+        "description": "Calculation group fixture",
+        "isHidden": false,
+        "columns": [
+          {
+            "name": "Time Calculation",
+            "sourceColumn": "Name",
+            "dataType": "string",
+            "isHidden": false,
+            "isKey": false,
+            "summarizeBy": "none",
+            "annotations": []
+          }
+        ],
+        "partitions": [],
+        "measures": [],
+        "hierarchies": [],
+        "calculationGroup": {
+          "precedence": 10,
+          "calculationItems": [
+            {
+              "name": "Current",
+              "expression": "SELECTEDMEASURE()",
+              "description": "No time transformation.",
+              "ordinal": 0
+            },
+            {
+              "name": "Year to Date",
+              "expression": [
+                "CALCULATE(",
+                "    SELECTEDMEASURE(),",
+                "    DATESYTD('Calendar'[Date])",
+                ")"
+              ],
+              "description": "Year-to-date transformation.",
+              "formatStringDefinition": {
+                "expression": "SELECTEDMEASUREFORMATSTRING()"
+              },
+              "ordinal": 1
+            }
+          ]
+        },
+        "annotations": []
+      }
+    ],
+    "relationships": [
+      {
+        "name": "Sales_Calendar",
+        "type": "singleColumn",
+        "fromTable": "Sales Data",
+        "fromColumn": "Order Date",
+        "toTable": "Calendar",
+        "toColumn": "Date",
+        "fromCardinality": "many",
+        "toCardinality": "one",
+        "crossFilteringBehavior": "oneDirection",
+        "isActive": true,
+        "annotations": []
+      },
+      {
+        "name": "Sales_Customer",
+        "type": "singleColumn",
+        "fromTable": "Sales Data",
+        "fromColumn": "Customer ID",
+        "toTable": "Customer's",
+        "toColumn": "Customer ID",
+        "fromCardinality": "many",
+        "toCardinality": "one",
+        "crossFilteringBehavior": "oneDirection",
+        "isActive": true,
+        "annotations": []
+      },
+      {
+        "name": "Sales_Product",
+        "type": "singleColumn",
+        "fromTable": "Sales Data",
+        "fromColumn": "Product ID",
+        "toTable": "Product",
+        "toColumn": "Product ID",
+        "fromCardinality": "many",
+        "toCardinality": "one",
+        "crossFilteringBehavior": "oneDirection",
+        "isActive": true,
+        "annotations": []
+      }
+    ],
+    "roles": [
+      {
+        "name": "West Region Reader",
+        "description": "Read-only row-level security fixture.",
+        "modelPermission": "read",
+        "tablePermissions": [
+          {
+            "name": "Customer's",
+            "filterExpression": "'Customer''s'[Region] = \"West\""
+          }
+        ],
+        "annotations": []
+      }
+    ],
+    "annotations": [
+      {
+        "name": "FixtureModel",
+        "value": "Phase3"
+      }
+    ]
+  }
+}

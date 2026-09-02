@@ -6,10 +6,11 @@ project is implemented in strict TypeScript and follows the six-phase plan in
 
 ## Current status
 
-Phases 1 and 2 are implemented. The project now has a production-shaped MCP transport plus tested
-Microsoft authentication, Fabric REST, and Power BI REST client boundaries. The clients are not
-wired to the 18 MCP tool handlers yet, so those tools continue to return a structured
-`NOT_IMPLEMENTED` result until their corresponding phases are implemented.
+Phases 1, 2, and 3 are implemented. The project now has a production-shaped MCP transport, tested
+Microsoft authentication and API clients, and a deterministic semantic-model definition and CRUD
+engine. These internal components are not wired to the 18 MCP tool handlers yet, so those tools
+continue to return a structured `NOT_IMPLEMENTED` result until their corresponding phases are
+implemented.
 
 Available now:
 
@@ -25,6 +26,14 @@ Available now:
 - Workspace-allowlisted Fabric and Power BI clients with read-only enforcement.
 - Bounded HTTP timeouts, response sizes, pagination, typed errors, request IDs, and safe retries.
 - Unit, contract, integration, and real MCP-client end-to-end tests.
+- Strict user-facing `ModelSpec` and supported TMSL `model.bim` contracts.
+- TMSL `model.bim` and `definition.pbism` base64 definition codecs with optional-part preservation.
+- Atomic CRUD batches for data sources, expressions, tables, columns, partitions, measures,
+  relationships, hierarchies, calculation groups/items, and roles.
+- Semantic invariants, dependency conflict reporting, stable SHA-256 hashes, and semantic diffs.
+- DAX quoting, reference extraction, and advisory lint rules ported from the Python reference.
+- A golden local definition fixture covering Unicode, apostrophes, multiline DAX/M, all supported
+  partition sources, calculation groups, hierarchies, relationships, and RLS.
 
 ## Requirements
 
@@ -76,10 +85,12 @@ build. To run only the protocol-level end-to-end test:
 npm run test:e2e
 ```
 
-That test starts the HTTP service on an ephemeral port and uses the official MCP TypeScript client
+Those tests start the HTTP service on an ephemeral port and use the official MCP TypeScript client
 to initialize, list tools, list and read resources, and call a placeholder tool through bearer
-authentication. It also runs the Microsoft clients against a real local HTTP fixture to verify
-audience-specific bearer tokens, request serialization, response parsing, and allowlisting.
+authentication. They run the Microsoft clients against a real local HTTP fixture to verify
+audience-specific bearer tokens, request serialization, response parsing, and allowlisting. The
+model pipeline test validates a golden TMSL definition, applies a multi-object atomic batch,
+serializes it into Fabric definition parts, reads it back, and verifies an identical semantic hash.
 
 An opt-in live smoke check performs only workspace and semantic-model reads:
 
@@ -148,7 +159,8 @@ read-only MCP resources.
 - The MCP service is stateless; no model definitions or credentials are written locally.
 - An empty workspace allowlist denies all Fabric and Power BI client calls.
 - External writes are blocked by default. Unsafe requests are never automatically retried.
-- Phase 2 clients are internal boundaries only; no MCP tool can invoke them yet.
+- Phase 2 clients and the Phase 3 model engine are internal boundaries only; no MCP tool can invoke
+  them yet.
 
 Bearer authentication is the initial Render test boundary. Microsoft Entra protection is planned
 for the later Azure deployment phase.

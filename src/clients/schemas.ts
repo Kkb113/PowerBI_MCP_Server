@@ -77,22 +77,24 @@ export const connectionSchema = z.object({
   }),
 });
 
+const executeQueriesErrorSchema = z.object({
+  code: z.string().optional(),
+  message: z.string().optional(),
+});
+
 export const executeQueriesResponseSchema = z.object({
+  error: executeQueriesErrorSchema.optional(),
   results: z.array(
     z.object({
       tables: z
         .array(
           z.object({
             rows: z.array(z.record(z.string(), jsonValueSchema)).optional(),
+            error: executeQueriesErrorSchema.optional(),
           }),
         )
         .optional(),
-      error: z
-        .object({
-          code: z.string().optional(),
-          message: z.string().optional(),
-        })
-        .optional(),
+      error: executeQueriesErrorSchema.optional(),
     }),
   ),
 });

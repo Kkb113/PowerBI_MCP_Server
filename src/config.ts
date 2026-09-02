@@ -23,6 +23,8 @@ const environmentSchema = z.object({
   HTTP_MAX_PAGES: z.coerce.number().int().min(1).max(1_000).default(100),
   HTTP_MAX_RESPONSE_BYTES: z.coerce.number().int().min(1_024).max(52_428_800).default(10_485_760),
   LRO_POLL_BUDGET_MS: z.coerce.number().int().min(0).max(600_000).default(60_000),
+  DAX_MAX_ROWS: z.coerce.number().int().min(1).max(10_000).default(1_000),
+  DAX_MAX_RESPONSE_BYTES: z.coerce.number().int().min(1_024).max(10_485_760).default(1_048_576),
 });
 
 export type LogLevel = z.infer<typeof environmentSchema>["LOG_LEVEL"];
@@ -50,6 +52,10 @@ export interface AppConfig {
     readonly maxResponseBytes: number;
   };
   readonly lroPollBudgetMs: number;
+  readonly dax: {
+    readonly maxRows: number;
+    readonly maxResponseBytes: number;
+  };
 }
 
 export class ConfigurationError extends Error {
@@ -142,5 +148,9 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
       maxResponseBytes: parsed.data.HTTP_MAX_RESPONSE_BYTES,
     }),
     lroPollBudgetMs: parsed.data.LRO_POLL_BUDGET_MS,
+    dax: Object.freeze({
+      maxRows: parsed.data.DAX_MAX_ROWS,
+      maxResponseBytes: parsed.data.DAX_MAX_RESPONSE_BYTES,
+    }),
   });
 }

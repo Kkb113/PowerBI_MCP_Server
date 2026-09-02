@@ -5,6 +5,8 @@ import { createBearerAuthMiddleware } from "../auth.js";
 import type { AppConfig } from "../config.js";
 import type { Logger } from "../logging.js";
 import { createFabricMcpServer } from "../mcp/server.js";
+import { createMcpWorkflowService } from "../services/factory.js";
+import type { McpToolHandler } from "../services/mcp-workflow-service.js";
 
 const jsonRpcError = (code: number, message: string) => ({
   jsonrpc: "2.0",
@@ -16,8 +18,18 @@ async function handleMcpRequest(
   request: Request,
   response: Response,
   logger: Logger,
+  config: AppConfig,
+  handler: McpToolHandler,
 ): Promise<void> {
-  const server = createFabricMcpServer();
+  const server = createFabricMcpServer({
+    handler,
+    logger,
+    knownSecrets: [
+      config.apiKey,
+      ...(config.azure.clientSecret ? [config.azure.clientSecret] : []),
+    ],
+    readOnly: config.readOnly,
+  });
   const transport = new NodeStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
   });
@@ -51,7 +63,12 @@ async function handleMcpRequest(
   }
 }
 
-export function createHttpApp(config: AppConfig, logger: Logger) {
+export interface HttpAppOptions {
+  readonly handler?: McpToolHandler;
+}
+
+export function createHttpApp(config: AppConfig, logger: Logger, options: HttpAppOptions = {}) {
+  const handler = options.handler ?? createMcpWorkflowService(config, logger);
   const app = createMcpExpressApp({
     host: config.host,
     allowedHosts: [...config.allowedHosts],
@@ -76,7 +93,7 @@ export function createHttpApp(config: AppConfig, logger: Logger) {
 
   app.use("/mcp", createBearerAuthMiddleware(config.apiKey, logger));
   app.post("/mcp", (request, response) => {
-    void handleMcpRequest(request, response, logger);
+    void handleMcpRequest(request, response, logger, config, handler);
   });
   app.all("/mcp", (_request, response) => {
     response.set("Allow", "POST");

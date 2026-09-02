@@ -26,6 +26,7 @@ describe("loadConfig", () => {
       maxResponseBytes: 10_485_760,
     });
     expect(config.lroPollBudgetMs).toBe(60_000);
+    expect(config.dax).toEqual({ maxRows: 1_000, maxResponseBytes: 1_048_576 });
     expect(Object.isFrozen(config)).toBe(true);
   });
 
@@ -44,6 +45,8 @@ describe("loadConfig", () => {
       HTTP_MAX_PAGES: "25",
       HTTP_MAX_RESPONSE_BYTES: "2048",
       LRO_POLL_BUDGET_MS: "45000",
+      DAX_MAX_ROWS: "250",
+      DAX_MAX_RESPONSE_BYTES: "4096",
     });
 
     expect(config.azure).toEqual({
@@ -61,6 +64,7 @@ describe("loadConfig", () => {
       maxResponseBytes: 2_048,
     });
     expect(config.lroPollBudgetMs).toBe(45_000);
+    expect(config.dax).toEqual({ maxRows: 250, maxResponseBytes: 4_096 });
   });
 
   it("requires complete client-secret settings and validates workspace IDs", () => {

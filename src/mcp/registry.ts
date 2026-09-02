@@ -209,7 +209,15 @@ export const TOOL_REGISTRY = [
     kind: "read",
     inputSchema: modelInput.extend({
       expression: z.string().trim().min(1).max(100_000),
-      culture: z.string().trim().min(2).max(32).optional(),
+      culture: z
+        .string()
+        .trim()
+        .min(2)
+        .max(32)
+        .describe(
+          "Reserved for a future Arrow adapter. Omit it to use the semantic model culture with the JSON endpoint.",
+        )
+        .optional(),
     }),
     annotations: readAnnotations,
   },
@@ -222,7 +230,15 @@ export const TOOL_REGISTRY = [
       query: z.string().trim().min(1).max(100_000),
       maxRows: z.number().int().min(1).max(10_000).default(1_000),
       includeNulls: z.boolean().default(false),
-      culture: z.string().trim().min(2).max(32).optional(),
+      culture: z
+        .string()
+        .trim()
+        .min(2)
+        .max(32)
+        .describe(
+          "Reserved for a future Arrow adapter. Omit it to use the semantic model culture with the JSON endpoint.",
+        )
+        .optional(),
     }),
     annotations: readAnnotations,
   },
@@ -338,7 +354,8 @@ export const RESOURCE_REGISTRY = [
 
 export const SERVER_INSTRUCTIONS = [
   "This server targets Microsoft Fabric cloud semantic models using a canonical TMSL model definition.",
-  "Phases 1 through 4 provide the transport, Microsoft clients, model engine, and internal Fabric lifecycle service; MCP handlers remain NOT_IMPLEMENTED until Phase 5.",
+  "Phase 5 exposes the Fabric lifecycle, bounded JSON DAX execution, refresh tracking, snapshots, diffs, and pre-deployment checks through MCP.",
   "Treat tool annotations as hints only. Write implementations also enforce preview-by-default, workspace allowlisting, expected-definition hashes, and repeated-ID, exact-name, explicit irreversible confirmation for permanent deletion.",
+  "The JSON DAX endpoint uses the semantic model culture; it does not support per-request culture overrides.",
   "Never place credentials, access tokens, tenant secrets, or connection secrets in tool arguments.",
 ].join(" ");

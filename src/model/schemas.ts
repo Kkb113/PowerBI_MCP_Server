@@ -23,7 +23,14 @@ export const summarizeBySchema = z.enum([
   "distinctCount",
 ]);
 
-const simpleJsonValueSchema = z.union([z.null(), z.boolean(), z.number().finite(), z.string()]);
+// The description prevents Zod from collapsing this union into a multi-valued JSON Schema
+// `type`, which is legal but not portable across all MCP clients. It emits explicit `anyOf` arms.
+const simpleJsonValueSchema = z.union([
+  z.null(),
+  z.boolean(),
+  z.number().finite(),
+  z.string().describe("String value."),
+]);
 const simpleJsonObjectSchema = z.record(z.string(), simpleJsonValueSchema);
 export const annotationSchema = z.strictObject({
   name: boundedNameSchema,

@@ -3,6 +3,7 @@ import type { AddressInfo } from "node:net";
 import type { AppConfig } from "../../src/config.js";
 import { createHttpApp } from "../../src/http/app.js";
 import { createLogger } from "../../src/logging.js";
+import type { McpToolHandler } from "../../src/services/mcp-workflow-service.js";
 
 export const TEST_API_KEY = "phase-one-test-api-key-000000000000";
 
@@ -24,6 +25,7 @@ export const TEST_CONFIG: AppConfig = Object.freeze({
     maxResponseBytes: 1_048_576,
   }),
   lroPollBudgetMs: 1_000,
+  dax: Object.freeze({ maxRows: 100, maxResponseBytes: 65_536 }),
 });
 
 export interface TestHttpServer {
@@ -40,9 +42,20 @@ const listen = (server: Server): Promise<void> =>
     });
   });
 
-export async function startTestHttpServer(): Promise<TestHttpServer> {
+const defaultHandler: McpToolHandler = {
+  execute: (name) =>
+    Promise.resolve({
+      status: "success",
+      message: `${name} test handler completed.`,
+      data: { tool: name },
+    }),
+};
+
+export async function startTestHttpServer(
+  handler: McpToolHandler = defaultHandler,
+): Promise<TestHttpServer> {
   const logger = createLogger({ level: "error", knownSecrets: [TEST_API_KEY], sink: () => {} });
-  const server = createServer(createHttpApp(TEST_CONFIG, logger));
+  const server = createServer(createHttpApp(TEST_CONFIG, logger, { handler }));
   await listen(server);
   const address = server.address() as AddressInfo;
 

@@ -2,6 +2,8 @@ import type { LogLevel } from "./config.js";
 
 const REDACTED = "[REDACTED]";
 const sensitiveKeyPattern = /authorization|cookie|password|secret|token|api[-_]?key/i;
+const responseSensitiveKeyPattern =
+  /authorization|cookie|password|client[-_]?secret|access[-_]?token|api[-_]?key/i;
 const bearerPattern = /\bBearer\s+[^\s,;]+/gi;
 const assignmentPattern = /\b(access_token|client_secret|password|api_key|apikey)=([^\s&,;]+)/gi;
 
@@ -56,6 +58,24 @@ export function redact(value: unknown, knownSecrets: readonly string[] = []): un
     );
   }
 
+  return value;
+}
+
+export function redactResponse(value: unknown, knownSecrets: readonly string[] = []): unknown {
+  if (typeof value === "string") {
+    return redactString(value, knownSecrets);
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => redactResponse(item, knownSecrets));
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        responseSensitiveKeyPattern.test(key) ? REDACTED : redactResponse(item, knownSecrets),
+      ]),
+    );
+  }
   return value;
 }
 

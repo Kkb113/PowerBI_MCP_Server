@@ -1,6 +1,6 @@
 # TypeScript Fabric Semantic Model MCP Server — Six-Phase Implementation Plan
 
-> Status: Phases 1-4 implemented on 2026-09-03. Phases 5-6 remain planned and are not implemented.
+> Status: Phases 1-5 implemented on 2026-09-03. Phase 6 remains planned and is not implemented.
 >
 > Research date: 2026-09-02
 
@@ -396,6 +396,19 @@ Connect the model engine to Fabric and complete item-level plus metadata-level C
 
 ### Phase 5 — DAX, refresh, MCP workflows, and safety controls
 
+#### Implementation status
+
+Implemented on 2026-09-03. All 18 frozen tools are connected to the lifecycle and workflow
+services. The implementation provides bounded JSON DAX validation/execution, asynchronous refresh
+tracking, normalized snapshots/diffs/gates, central read-only enforcement, stable structured
+results, and response-boundary secret redaction. Automated tests exercise every tool through the
+official MCP TypeScript client. The opt-in live check creates and permanently cleans up one
+uniquely named disposable model.
+
+The live Phase 5 gate passed on 2026-09-03: Fabric completed the disposable model refresh, the DAX
+validation and bounded smoke query succeeded through MCP, and the strong permanent-delete cleanup
+completed with no active test artifact left behind.
+
 #### Objective
 
 Expose the completed lifecycle through useful MCP tools and prove that a deployed model actually works.
@@ -484,6 +497,7 @@ Expected configuration:
 | `FABRIC_ALLOWED_WORKSPACE_IDS` | Comma-separated hard allowlist                                       |
 | `POWERBI_MCP_READONLY`         | Enforced write lockdown                                              |
 | `DAX_MAX_ROWS`                 | Server-side maximum with a conservative default                      |
+| `DAX_MAX_RESPONSE_BYTES`       | Maximum serialized DAX/tool data returned to an MCP caller           |
 | `HTTP_TIMEOUT_MS`              | Outbound request timeout                                             |
 | `LRO_POLL_BUDGET_MS`           | Maximum synchronous polling budget                                   |
 | `LOG_LEVEL`                    | Structured log verbosity without secret or row logging               |
@@ -576,6 +590,7 @@ Deployment is intentionally outside the six implementation phases. Phase 6 only 
 - [Get Fabric operation state](https://learn.microsoft.com/en-us/rest/api/fabric/core/long-running-operations/get-operation-state)
 - [Get Fabric operation result](https://learn.microsoft.com/en-us/rest/api/fabric/core/long-running-operations/get-operation-result)
 - [Execute DAX queries through Power BI REST](https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/execute-queries-in-group)
+- [Execute DAX queries with Arrow responses and request culture](https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/execute-dax-queries-in-group)
 - [Refresh a semantic model](https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/refresh-dataset-in-group)
 - [Get semantic model refresh history](https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/get-refresh-history-in-group)
 - [Inspect refresh execution](https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/get-refresh-execution-details-in-group)

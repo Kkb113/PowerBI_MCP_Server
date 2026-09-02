@@ -25,6 +25,7 @@ describe("loadConfig", () => {
       maxPages: 100,
       maxResponseBytes: 10_485_760,
     });
+    expect(config.lroPollBudgetMs).toBe(60_000);
     expect(Object.isFrozen(config)).toBe(true);
   });
 
@@ -42,6 +43,7 @@ describe("loadConfig", () => {
       HTTP_MAX_RETRIES: "3",
       HTTP_MAX_PAGES: "25",
       HTTP_MAX_RESPONSE_BYTES: "2048",
+      LRO_POLL_BUDGET_MS: "45000",
     });
 
     expect(config.azure).toEqual({
@@ -58,6 +60,7 @@ describe("loadConfig", () => {
       maxPages: 25,
       maxResponseBytes: 2_048,
     });
+    expect(config.lroPollBudgetMs).toBe(45_000);
   });
 
   it("requires complete client-secret settings and validates workspace IDs", () => {

@@ -180,7 +180,8 @@ describe("FabricClient read operations", () => {
       .mockResolvedValueOnce(
         jsonResponse(200, {
           status: "Succeeded",
-          createdTimeUtc: "2026-09-02T12:00:00Z",
+          createdTimeUtc: "2026-09-02T12:00:00.1234567",
+          lastUpdatedTimeUtc: "2026-09-02T12:00:01.1234567",
           percentComplete: 100,
           error: null,
         }),
@@ -198,6 +199,42 @@ describe("FabricClient read operations", () => {
         z.object({ definition: z.object({ format: z.literal("TMSL") }) }),
       ),
     ).resolves.toEqual({ definition: { format: "TMSL" } });
+  });
+
+  it("accepts a null operation percentage while Fabric is processing", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse(200, {
+        status: "Running",
+        percentComplete: null,
+        error: null,
+      }),
+    );
+    const client = createFabricClient(fetchMock);
+
+    await expect(client.getOperationState(OPERATION_ID)).resolves.toMatchObject({
+      status: "Running",
+      percentComplete: null,
+    });
+  });
+
+  it("gets connection metadata without returning credentials", async () => {
+    const connection = {
+      id: OPERATION_ID,
+      displayName: "Sales SQL",
+      connectivityType: "ShareableCloud",
+      connectionDetails: { type: "SQL", path: "server;database" },
+      credentialDetails: { credentialType: "ServicePrincipal" },
+    };
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(200, connection));
+    const client = createFabricClient(fetchMock);
+
+    await expect(client.getConnection(OPERATION_ID)).resolves.toEqual({
+      id: OPERATION_ID,
+      displayName: "Sales SQL",
+      connectivityType: "ShareableCloud",
+      connectionDetails: { type: "SQL", path: "server;database" },
+    });
+    expect(inputUrl(fetchMock.mock.calls[0]?.[0])).toContain(`/v1/connections/${OPERATION_ID}`);
   });
 });
 
@@ -238,7 +275,7 @@ describe("FabricClient mutation boundary", () => {
     expect(inputUrl(fetchMock.mock.calls[1]?.[0])).toContain("updateMetadata=false");
   });
 
-  it("updates properties and definitions, soft-deletes, and binds one connection", async () => {
+  it("updates properties and definitions, permanently deletes, and binds one connection", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(jsonResponse(200))
@@ -253,9 +290,9 @@ describe("FabricClient mutation boundary", () => {
         description: "Description",
       }),
     ).resolves.toMatchObject({ status: 200 });
-    await expect(client.deleteSemanticModel(WORKSPACE_ID, MODEL_ID)).resolves.toMatchObject({
-      status: 200,
-    });
+    await expect(
+      client.permanentlyDeleteSemanticModel(WORKSPACE_ID, MODEL_ID),
+    ).resolves.toMatchObject({ status: 200 });
     await expect(
       client.updateSemanticModelDefinition(WORKSPACE_ID, MODEL_ID, definition),
     ).resolves.toEqual({ kind: "completed", data: undefined, requestId: undefined });
@@ -275,7 +312,7 @@ describe("FabricClient mutation boundary", () => {
       "POST",
       "POST",
     ]);
-    expect(inputUrl(fetchMock.mock.calls[1]?.[0])).toContain("hardDelete=false");
+    expect(inputUrl(fetchMock.mock.calls[1]?.[0])).toContain("hardDelete=true");
     expect(inputUrl(fetchMock.mock.calls[3]?.[0])).toContain("bindConnection");
   });
 
@@ -289,9 +326,9 @@ describe("FabricClient mutation boundary", () => {
     await expect(
       client.updateSemanticModel(WORKSPACE_ID, MODEL_ID, { displayName: "Renamed" }),
     ).rejects.toMatchObject({ code: "READ_ONLY_VIOLATION" });
-    await expect(client.deleteSemanticModel(WORKSPACE_ID, MODEL_ID)).rejects.toMatchObject({
-      code: "READ_ONLY_VIOLATION",
-    });
+    await expect(
+      client.permanentlyDeleteSemanticModel(WORKSPACE_ID, MODEL_ID),
+    ).rejects.toMatchObject({ code: "READ_ONLY_VIOLATION" });
     await expect(
       client.updateSemanticModelDefinition(WORKSPACE_ID, MODEL_ID, definition),
     ).rejects.toMatchObject({ code: "READ_ONLY_VIOLATION" });

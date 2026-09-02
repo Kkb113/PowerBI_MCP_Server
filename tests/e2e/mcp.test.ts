@@ -39,8 +39,8 @@ describe("remote MCP end to end", () => {
     });
     const content = resource.contents[0];
     expect(content && "text" in content ? JSON.parse(content.text) : undefined).toMatchObject({
-      phase: 1,
-      implementationStatus: "contract_only",
+      phase: 4,
+      implementationStatus: "lifecycle_service_internal",
       fabricMutationEnabled: false,
     });
 

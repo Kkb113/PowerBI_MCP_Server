@@ -6,7 +6,7 @@
 
 ## Context
 
-The server must eventually create, inspect, update, query, refresh, and soft-delete Microsoft
+The server must eventually create, inspect, update, query, refresh, and safely delete Microsoft
 Fabric semantic models from a remote Linux container. The Python reference includes useful model
 analysis and safety behavior, but its Desktop and local authoring paths are not usable in Render or
 Azure Container Apps. Fabric accepts semantic model definitions in TMSL or TMDL formats.

@@ -7,13 +7,13 @@ import { toolOutputSchema } from "./schemas.js";
 const safetyRules = {
   scope: "Fabric cloud semantic models only",
   canonicalDefinitionFormat: "TMSL",
-  phase: 1,
+  phase: 4,
   fabricMutationEnabled: false,
   controls: [
     "preview before mutation",
     "workspace allowlisting",
     "expected definition hash for model changes",
-    "exact display-name confirmation before soft delete",
+    "repeated ID, exact display-name, and explicit irreversible confirmation before permanent deletion",
     "secret-free tool arguments and responses",
   ],
 } as const;
@@ -74,8 +74,8 @@ export function createFabricMcpServer(): McpServer {
         const value =
           resource.name === "semantic-model-capabilities"
             ? {
-                phase: 1,
-                implementationStatus: "contract_only",
+                phase: 4,
+                implementationStatus: "lifecycle_service_internal",
                 fabricMutationEnabled: false,
                 referenceCommit: REFERENCE_COMMIT,
                 tools: TOOL_NAMES,

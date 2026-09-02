@@ -219,7 +219,14 @@ export function modelSpecToBim(input: unknown): ModelBim {
         annotations: group.columnAnnotations,
       },
     ],
-    partitions: [],
+    partitions: [
+      {
+        name: group.tableName,
+        mode: "import" as const,
+        source: { type: "calculationGroup" as const },
+        annotations: [],
+      },
+    ],
     measures: [],
     hierarchies: [],
     calculationGroup: {
@@ -232,7 +239,6 @@ export function modelSpecToBim(input: unknown): ModelBim {
           ? {}
           : { formatStringDefinition: { expression: item.formatStringExpression } }),
         ...(item.ordinal === undefined ? {} : { ordinal: item.ordinal }),
-        annotations: item.annotations,
       })),
     },
     ...(group.lineageTag === undefined ? {} : { lineageTag: group.lineageTag }),
@@ -430,6 +436,11 @@ export function bimToModelSpec(input: unknown): ModelSpec {
               expression: expressionText(partition.source.expression),
               annotations: partition.annotations,
             };
+          case "calculationGroup":
+            throw new ModelError(
+              "UNSUPPORTED_CALCULATION_GROUP",
+              `Regular table '${table.name}' cannot use a calculation-group partition.`,
+            );
         }
       }),
       measures: table.measures.map((measure) => ({
@@ -483,10 +494,13 @@ export function bimToModelSpec(input: unknown): ModelSpec {
             `Table '${table.name}' is missing a calculation group.`,
           );
         }
+        const calculationGroupPartition = table.partitions[0];
         if (
           table.columns.length !== 1 ||
           table.columns[0]?.type === "calculated" ||
-          table.partitions.length > 0 ||
+          table.partitions.length !== 1 ||
+          calculationGroupPartition?.source.type !== "calculationGroup" ||
+          calculationGroupPartition.mode !== "import" ||
           table.measures.length > 0 ||
           table.hierarchies.length > 0
         ) {
@@ -533,7 +547,6 @@ export function bimToModelSpec(input: unknown): ModelSpec {
             ? {}
             : { formatStringExpression: expressionText(item.formatStringDefinition.expression) }),
           ...(item.ordinal === undefined ? {} : { ordinal: item.ordinal }),
-          annotations: item.annotations,
         })),
       })),
     roles: bim.model.roles.map((role) => ({

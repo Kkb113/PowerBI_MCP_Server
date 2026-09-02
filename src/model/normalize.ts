@@ -63,10 +63,7 @@ export function normalizeModelSpec(input: unknown): ModelSpec {
         ...group,
         annotations: [...group.annotations].sort(byName),
         columnAnnotations: [...group.columnAnnotations].sort(byName),
-        items: group.items.map((item) => ({
-          ...item,
-          annotations: [...item.annotations].sort(byName),
-        })),
+        items: group.items.map((item) => ({ ...item })),
       })),
     roles: [...parsed.roles].sort(byName).map((role) => ({
       ...role,

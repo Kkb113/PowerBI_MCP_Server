@@ -1,6 +1,6 @@
 # TypeScript Fabric Semantic Model MCP Server — Six-Phase Implementation Plan
 
-> Status: Phases 1-3 implemented on 2026-09-02. Phases 4-6 remain planned and are not implemented.
+> Status: Phases 1-4 implemented on 2026-09-03. Phases 5-6 remain planned and are not implemented.
 >
 > Research date: 2026-09-02
 
@@ -9,7 +9,7 @@
 Build a small, production-minded TypeScript MCP server that can manage the complete lifecycle of a Microsoft Fabric semantic model:
 
 - Discover Fabric workspaces and semantic models.
-- Create, read, update, and soft-delete semantic model items.
+- Create, read, update, and permanently delete semantic model items with strong confirmation.
 - Create, update, and delete model metadata such as tables, columns, partitions, measures, relationships, hierarchies, calculation groups, expressions, and roles.
 - Author DAX expressions in measures and calculated objects.
 - Execute DAX queries against a deployed semantic model.
@@ -33,7 +33,7 @@ The six phases are complete only when a clean test workspace can pass this lifec
 7. Execute a DAX smoke query and return bounded structured results.
 8. Update item properties and verify the change.
 9. Produce a model summary, definition hash, and semantic diff.
-10. Soft-delete the test model and verify that it is no longer listed.
+10. Permanently delete the test model with repeated-ID, exact-name, and explicit irreversible confirmation, then verify that it is no longer listed.
 
 “CRUD” refers to the semantic model item and its metadata. It does not mean inserting, updating, or deleting business-data rows. Row-level data mutations belong to the underlying Warehouse, Lakehouse, SQL database, or other data source.
 
@@ -125,7 +125,7 @@ fetch current definition
         -> read back and verify resulting hash
 ```
 
-The `expectedDefinitionHash` prevents silently overwriting a model changed by another user or process. A preview is the default for destructive batches. Hard delete is disabled in the first release; semantic model deletion uses Fabric’s recoverable delete behavior.
+The `expectedDefinitionHash` prevents silently overwriting a model changed by another user or process. A preview is the default for destructive batches. Fabric item recovery does not currently support semantic models, so deletion is explicitly permanent and requires a repeated matching model ID, the exact current display name, `confirmPermanentDelete: true`, and `apply: true`.
 
 ### 4.6 Small dependency set
 
@@ -205,7 +205,7 @@ The tool names and schemas are frozen in Phase 1. The smallest useful surface is
 | `create_semantic_model`            | Create a complete model from a typed specification                                                    | Write                           |
 | `update_semantic_model_properties` | Rename or change description                                                                          | Write                           |
 | `apply_model_changes`              | Preview or apply typed create/update/delete operations to model objects                               | Write/destructive as applicable |
-| `delete_semantic_model`            | Soft-delete a model after explicit confirmation                                                       | Destructive                     |
+| `delete_semantic_model`            | Permanently delete a model after repeated-ID, exact-name, and irreversible confirmation               | Destructive                     |
 | `bind_semantic_model_connection`   | Bind one model source reference to one Fabric connection                                              | Write                           |
 | `validate_dax`                     | Execute a bounded validation probe against a deployed model                                           | Read-only                       |
 | `execute_dax`                      | Execute a row-capped DAX query                                                                        | Read-only                       |
@@ -358,6 +358,16 @@ have an explicit lossless mapping.
 
 ### Phase 4 — Fabric semantic-model lifecycle and safe live mutations
 
+#### Implementation status
+
+Implemented and live-verified on 2026-09-03. The lifecycle service covers preview-first creation,
+bounded reads, item-property updates, optimistic whole-definition mutations, connection binding,
+long-running operations, read-back verification, and strongly confirmed permanent deletion. A
+self-contained disposable model passed live item and representative object CRUD, stale-hash
+rejection, definition readback, and exact-target permanent cleanup. Because that model had no
+external source, live connection binding was not applicable and remains covered by unit and local
+HTTP end-to-end tests.
+
 #### Objective
 
 Connect the model engine to Fabric and complete item-level plus metadata-level CRUD.
@@ -370,14 +380,14 @@ Connect the model engine to Fabric and complete item-level plus metadata-level C
 - Implement `apply_model_changes` as fetch -> hash check -> mutate -> validate -> diff -> optionally submit -> read-back verification.
 - Make preview/dry-run the default for destructive operation batches.
 - Require `expectedDefinitionHash` on live updates after the initial model creation.
-- Implement soft delete with explicit model ID and display-name confirmation. Do not expose hard delete.
+- Implement permanent deletion with target ID, repeated matching ID, exact current display name, `confirmPermanentDelete: true`, and `apply: true`.
 - Implement connection binding one source reference at a time, reflecting Fabric’s API behavior.
 - On a development Fabric workspace, run a controlled CRUD matrix against a uniquely named disposable model.
-- Clean up the disposable model using soft delete after evidence is captured.
+- Clean up the disposable model using the same permanent-delete confirmation path after evidence is captured.
 
 #### Phase gate
 
-- The development workspace proves create, get, list, property update, definition update, connection bind where applicable, and soft delete.
+- The development workspace proves create, get, list, property update, definition update, connection bind where applicable, and strongly confirmed permanent deletion.
 - Representative object CRUD succeeds for table/column/partition, measure, relationship, hierarchy, calculation group, and role.
 - A stale `expectedDefinitionHash` is rejected before update.
 - Invalid references and invalid definitions never reach the Fabric update endpoint.
@@ -520,18 +530,18 @@ Deployment is intentionally outside the six implementation phases. Phase 6 only 
 
 ## 13. Main risks and simple mitigations
 
-| Risk                                                      | Mitigation                                                                                                                                                    |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Fabric APIs or payloads change                            | Keep all endpoint details in two small API clients, validate responses, pin contract fixtures, and verify against a live development tenant in every release. |
-| Full-definition update overwrites concurrent work         | Require `expectedDefinitionHash`, show a semantic diff, and reject stale updates.                                                                             |
-| TMSL conversion of an existing TMDL model is not lossless | Limit the first guarantee to models created by this server until the Phase 6 round-trip test passes.                                                          |
-| Invalid DAX is discovered only after deployment           | Run static lint first, validate executable expressions against a deployed test model, and use a pre-deploy preview plus post-update smoke query.              |
-| DAX REST service-principal limitations with RLS/SSO       | Document the limitation; add the newer Arrow DAX endpoint, delegated identity, or XMLA only when a real target model requires it.                             |
-| Connection credentials cannot live in model files         | Bind to a separately managed Fabric connection and never return its credentials through MCP.                                                                  |
-| Long Fabric operations exceed an HTTP request             | Use bounded polling and resumable status tools; do not introduce a job queue.                                                                                 |
-| Render loses local files or restarts                      | Keep the server stateless and store authoritative state in Fabric; emit logs to the platform.                                                                 |
-| An agent invokes a destructive operation incorrectly      | Use MCP annotations plus enforced preview, confirmation, allowlisting, soft delete, read-only mode, and hash concurrency checks.                              |
-| MCP responses become too large                            | Return summaries and caps by default; require explicit full-definition export.                                                                                |
+| Risk                                                      | Mitigation                                                                                                                                                                           |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Fabric APIs or payloads change                            | Keep all endpoint details in two small API clients, validate responses, pin contract fixtures, and verify against a live development tenant in every release.                        |
+| Full-definition update overwrites concurrent work         | Require `expectedDefinitionHash`, show a semantic diff, and reject stale updates.                                                                                                    |
+| TMSL conversion of an existing TMDL model is not lossless | Limit the first guarantee to models created by this server until the Phase 6 round-trip test passes.                                                                                 |
+| Invalid DAX is discovered only after deployment           | Run static lint first, validate executable expressions against a deployed test model, and use a pre-deploy preview plus post-update smoke query.                                     |
+| DAX REST service-principal limitations with RLS/SSO       | Document the limitation; add the newer Arrow DAX endpoint, delegated identity, or XMLA only when a real target model requires it.                                                    |
+| Connection credentials cannot live in model files         | Bind to a separately managed Fabric connection and never return its credentials through MCP.                                                                                         |
+| Long Fabric operations exceed an HTTP request             | Use bounded polling and resumable status tools; do not introduce a job queue.                                                                                                        |
+| Render loses local files or restarts                      | Keep the server stateless and store authoritative state in Fabric; emit logs to the platform.                                                                                        |
+| An agent invokes a destructive operation incorrectly      | Use MCP annotations plus enforced preview, repeated-ID and exact-name confirmation, an explicit permanent-delete literal, allowlisting, read-only mode, and hash concurrency checks. |
+| MCP responses become too large                            | Return summaries and caps by default; require explicit full-definition export.                                                                                                       |
 
 ## 14. Research basis
 

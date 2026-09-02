@@ -28,7 +28,7 @@ const expectedTools = [
 ] as const;
 
 describe("MCP registry parity", () => {
-  it("matches the frozen Phase 1 tool contract exactly", () => {
+  it("matches the first-release tool catalog exactly", () => {
     expect(TOOL_NAMES).toEqual(expectedTools);
     expect(new Set(TOOL_NAMES).size).toBe(expectedTools.length);
   });
@@ -68,6 +68,7 @@ describe("MCP registry parity", () => {
       (tool) => tool.name === "update_semantic_model_properties",
     );
     const preDeploy = TOOL_REGISTRY.find((tool) => tool.name === "pre_deploy_gate");
+    const deleteModel = TOOL_REGISTRY.find((tool) => tool.name === "delete_semantic_model");
     const ids = {
       workspaceId: "00000000-0000-4000-8000-000000000001",
       semanticModelId: "00000000-0000-4000-8000-000000000002",
@@ -77,6 +78,35 @@ describe("MCP registry parity", () => {
     expect(updateProperties?.inputSchema.safeParse({ ...ids, displayName: "Sales" }).success).toBe(
       true,
     );
+    expect(
+      updateProperties?.inputSchema.safeParse({
+        ...ids,
+        description: "x".repeat(257),
+      }).success,
+    ).toBe(false);
+    expect(
+      deleteModel?.inputSchema.safeParse({
+        ...ids,
+        confirmSemanticModelId: ids.semanticModelId,
+        confirmDisplayName: "Sales",
+      }).success,
+    ).toBe(false);
+    expect(
+      deleteModel?.inputSchema.safeParse({
+        ...ids,
+        confirmSemanticModelId: ids.semanticModelId,
+        confirmDisplayName: "Sales",
+        confirmPermanentDelete: true,
+      }).success,
+    ).toBe(true);
+    expect(
+      deleteModel?.inputSchema.safeParse({
+        ...ids,
+        confirmSemanticModelId: "00000000-0000-4000-8000-000000000003",
+        confirmDisplayName: "Sales",
+        confirmPermanentDelete: true,
+      }).success,
+    ).toBe(false);
     expect(preDeploy?.inputSchema.safeParse({}).success).toBe(false);
     expect(preDeploy?.inputSchema.safeParse(ids).success).toBe(true);
   });

@@ -322,7 +322,16 @@
             "annotations": []
           }
         ],
-        "partitions": [],
+        "partitions": [
+          {
+            "name": "Time Intelligence",
+            "mode": "import",
+            "source": {
+              "type": "calculationGroup"
+            },
+            "annotations": []
+          }
+        ],
         "measures": [],
         "hierarchies": [],
         "calculationGroup": {

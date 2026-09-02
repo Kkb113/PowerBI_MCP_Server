@@ -187,12 +187,11 @@ export const calculationItemSchema = z.strictObject({
   description: optionalDescriptionSchema,
   formatStringExpression: expressionSchema.optional(),
   ordinal: z.number().int().min(0).optional(),
-  annotations: annotationsSchema,
 });
 
 export const calculationGroupSchema = z.strictObject({
   tableName: boundedNameSchema,
-  columnName: boundedNameSchema.optional(),
+  columnName: boundedNameSchema.default("Name"),
   description: optionalDescriptionSchema,
   precedence: z.number().int().min(0).max(10_000).default(0),
   items: z.array(calculationItemSchema).min(1).max(1_000),
@@ -366,6 +365,7 @@ const tmslPartitionSourceSchema = z.discriminatedUnion("type", [
     dataSource: boundedNameSchema,
   }),
   z.strictObject({ type: z.literal("calculated"), expression: expressionTextSchema }),
+  z.strictObject({ type: z.literal("calculationGroup") }),
 ]);
 
 const tmslPartitionSchema = z
@@ -379,6 +379,7 @@ const tmslPartitionSchema = z
     const validMode =
       (partition.source.type === "entity" && partition.mode === "directLake") ||
       (partition.source.type === "calculated" && partition.mode === "import") ||
+      (partition.source.type === "calculationGroup" && partition.mode === "import") ||
       ((partition.source.type === "m" || partition.source.type === "query") &&
         (partition.mode === "import" || partition.mode === "directQuery"));
     if (!validMode) {
@@ -425,7 +426,6 @@ const tmslCalculationItemSchema = z.strictObject({
   description: optionalDescriptionSchema,
   formatStringDefinition: z.strictObject({ expression: expressionTextSchema }).optional(),
   ordinal: z.number().int().min(0).optional(),
-  annotations: annotationsSchema,
 });
 
 const tmslCalculationGroupSchema = z.strictObject({
@@ -453,9 +453,11 @@ const tmslRelationshipSchema = z.strictObject({
   fromColumn: boundedNameSchema,
   toTable: boundedNameSchema,
   toColumn: boundedNameSchema,
-  fromCardinality: z.enum(["one", "many"]),
-  toCardinality: z.enum(["one", "many"]),
-  crossFilteringBehavior: z.enum(["oneDirection", "bothDirections", "automatic"]),
+  fromCardinality: z.enum(["one", "many"]).default("many"),
+  toCardinality: z.enum(["one", "many"]).default("one"),
+  crossFilteringBehavior: z
+    .enum(["oneDirection", "bothDirections", "automatic"])
+    .default("oneDirection"),
   securityFilteringBehavior: z.enum(["oneDirection", "bothDirections"]).optional(),
   isActive: z.boolean().default(true),
   annotations: annotationsSchema,
@@ -514,7 +516,7 @@ export const definitionPbismSchema = z.strictObject({
   $schema: z.literal(
     "https://developer.microsoft.com/json-schemas/fabric/item/semanticModel/definitionProperties/1.0.0/schema.json",
   ),
-  version: z.literal("5.0"),
+  version: z.string().regex(/^\d{1,3}\.\d{1,3}$/u),
   settings: z.strictObject({ qnaEnabled: z.boolean().default(false) }),
 });
 

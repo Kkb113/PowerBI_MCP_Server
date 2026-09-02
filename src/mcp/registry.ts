@@ -136,7 +136,7 @@ export const TOOL_REGISTRY = [
     kind: "write",
     inputSchema: workspaceInput.extend({
       displayName: z.string().trim().min(1).max(256),
-      description: z.string().max(4_000).optional(),
+      description: z.string().max(256).optional(),
       model: modelSpecSchema,
       apply: z.boolean().default(false),
     }),
@@ -150,7 +150,7 @@ export const TOOL_REGISTRY = [
     inputSchema: modelInput
       .extend({
         displayName: z.string().trim().min(1).max(256).optional(),
-        description: z.string().max(4_000).nullable().optional(),
+        description: z.string().max(256).nullable().optional(),
         apply: z.boolean().default(false),
       })
       .refine((value) => value.displayName !== undefined || value.description !== undefined, {
@@ -173,13 +173,21 @@ export const TOOL_REGISTRY = [
   },
   {
     name: "delete_semantic_model",
-    title: "Delete semantic model",
-    description: "Soft-delete a semantic model after exact display-name confirmation.",
+    title: "Permanently delete semantic model",
+    description:
+      "Permanently and irreversibly delete a semantic model after repeated-ID, exact-name, and explicit permanent-delete confirmation.",
     kind: "destructive",
-    inputSchema: modelInput.extend({
-      confirmDisplayName: z.string().trim().min(1).max(256),
-      apply: z.boolean().default(false),
-    }),
+    inputSchema: modelInput
+      .extend({
+        confirmSemanticModelId: fabricIdSchema,
+        confirmDisplayName: z.string().trim().min(1).max(256),
+        confirmPermanentDelete: z.literal(true),
+        apply: z.boolean().default(false),
+      })
+      .refine((value) => value.confirmSemanticModelId === value.semanticModelId, {
+        path: ["confirmSemanticModelId"],
+        message: "The repeated semantic model ID must exactly match semanticModelId.",
+      }),
     annotations: destructiveAnnotations,
   },
   {
@@ -316,7 +324,7 @@ export const RESOURCE_REGISTRY = [
     name: "semantic-model-capabilities",
     uri: "fabric://reference/capabilities",
     title: "Semantic model MCP capabilities",
-    description: "Frozen Phase 1 tool catalog and implementation status.",
+    description: "First-release tool catalog and current implementation status.",
     mimeType: "application/json",
   },
   {
@@ -330,7 +338,7 @@ export const RESOURCE_REGISTRY = [
 
 export const SERVER_INSTRUCTIONS = [
   "This server targets Microsoft Fabric cloud semantic models using a canonical TMSL model definition.",
-  "Phase 1 exposes a frozen contract only; every Fabric-facing tool returns NOT_IMPLEMENTED and performs no Fabric request or mutation.",
-  "Treat tool annotations as hints only. Future write implementations will also enforce preview-by-default, workspace allowlisting, expected-definition hashes, and explicit confirmation for deletion.",
+  "Phases 1 through 4 provide the transport, Microsoft clients, model engine, and internal Fabric lifecycle service; MCP handlers remain NOT_IMPLEMENTED until Phase 5.",
+  "Treat tool annotations as hints only. Write implementations also enforce preview-by-default, workspace allowlisting, expected-definition hashes, and repeated-ID, exact-name, explicit irreversible confirmation for permanent deletion.",
   "Never place credentials, access tokens, tenant secrets, or connection secrets in tool arguments.",
 ].join(" ");

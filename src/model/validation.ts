@@ -285,12 +285,6 @@ const validateAnnotationNames = (model: ModelSpec, issues: ModelIssue[]): void =
   for (const group of model.calculationGroups) {
     inspect(group.annotations, `calculationGroups.${group.tableName}.annotations`);
     inspect(group.columnAnnotations, `calculationGroups.${group.tableName}.columnAnnotations`);
-    for (const item of group.items) {
-      inspect(
-        item.annotations,
-        `calculationGroups.${group.tableName}.items.${item.name}.annotations`,
-      );
-    }
   }
   for (const role of model.roles) inspect(role.annotations, `roles.${role.name}.annotations`);
 };

@@ -4,6 +4,7 @@ import type { ApiResponse } from "./http-client.js";
 import type { ResilientHttpClient } from "./http-client.js";
 import { validateUuid, WorkspacePolicy } from "./policy.js";
 import {
+  connectionSchema,
   operationStateSchema,
   semanticModelDefinitionResponseSchema,
   semanticModelDefinitionSchema,
@@ -11,6 +12,7 @@ import {
   semanticModelSchema,
   workspacePageSchema,
   type OperationState,
+  type Connection,
   type SemanticModel,
   type SemanticModelDefinition,
   type Workspace,
@@ -171,6 +173,20 @@ export class FabricClient {
     return this.requireData(response, operation);
   }
 
+  public async getConnection(connectionId: string): Promise<Connection> {
+    const operation = "get_connection";
+    const validConnectionId = validateUuid(connectionId, "connectionId", operation, "fabric");
+    const response = await this.http.request({
+      service: "fabric",
+      operation,
+      method: "GET",
+      path: `/v1/connections/${validConnectionId}`,
+      responseSchema: connectionSchema,
+      retryMode: "safe",
+    });
+    return this.requireData(response, operation);
+  }
+
   public async createSemanticModel(
     workspaceId: string,
     request: CreateSemanticModelRequest,
@@ -220,7 +236,7 @@ export class FabricClient {
     });
   }
 
-  public async deleteSemanticModel(
+  public async permanentlyDeleteSemanticModel(
     workspaceId: string,
     semanticModelId: string,
   ): Promise<ApiResponse<undefined>> {
@@ -232,7 +248,7 @@ export class FabricClient {
       operation,
       method: "DELETE",
       path: ids.path,
-      query: { hardDelete: false },
+      query: { hardDelete: true },
       expectedStatuses: [200],
       allowEmptyResponse: true,
       retryMode: "never",

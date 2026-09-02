@@ -49,11 +49,13 @@ export const semanticModelDefinitionResponseSchema = z.object({
   definition: semanticModelDefinitionSchema,
 });
 
+const fabricTimestampSchema = z.string().trim().min(1).max(64);
+
 export const operationStateSchema = z.object({
   status: z.string().min(1),
-  createdTimeUtc: z.iso.datetime({ offset: true }).optional(),
-  lastUpdatedTimeUtc: z.iso.datetime({ offset: true }).optional(),
-  percentComplete: z.number().int().min(0).max(100).optional(),
+  createdTimeUtc: fabricTimestampSchema.optional(),
+  lastUpdatedTimeUtc: fabricTimestampSchema.optional(),
+  percentComplete: z.number().int().min(0).max(100).nullable().optional(),
   error: z
     .object({
       errorCode: z.string().optional(),
@@ -63,6 +65,16 @@ export const operationStateSchema = z.object({
     })
     .nullable()
     .optional(),
+});
+
+export const connectionSchema = z.object({
+  id: z.uuid(),
+  displayName: z.string().min(1),
+  connectivityType: z.string().trim().min(1),
+  connectionDetails: z.object({
+    type: z.string().trim().min(1),
+    path: z.string().trim().min(1),
+  }),
 });
 
 export const executeQueriesResponseSchema = z.object({
@@ -129,6 +141,7 @@ export type Workspace = z.infer<typeof workspaceSchema>;
 export type SemanticModel = z.infer<typeof semanticModelSchema>;
 export type SemanticModelDefinition = z.infer<typeof semanticModelDefinitionSchema>;
 export type OperationState = z.infer<typeof operationStateSchema>;
+export type Connection = z.infer<typeof connectionSchema>;
 export type ExecuteQueriesResponse = z.infer<typeof executeQueriesResponseSchema>;
 export type Refresh = z.infer<typeof refreshSchema>;
 export type RefreshExecutionDetails = z.infer<typeof refreshExecutionDetailsSchema>;

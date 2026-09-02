@@ -20,6 +20,7 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "vitest run tests/e2e",
     "test:live": "tsx scripts/live-smoke.ts",
+    "test:live:phase4": "tsx scripts/live-phase4.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

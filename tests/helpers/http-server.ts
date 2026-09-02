@@ -23,6 +23,7 @@ export const TEST_CONFIG: AppConfig = Object.freeze({
     maxPages: 10,
     maxResponseBytes: 1_048_576,
   }),
+  lroPollBudgetMs: 1_000,
 });
 
 export interface TestHttpServer {

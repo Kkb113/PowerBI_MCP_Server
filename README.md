@@ -6,9 +6,10 @@ project is implemented in strict TypeScript and follows the six-phase plan in
 
 ## Current status
 
-Phases 1, 2, and 3 are implemented. The project now has a production-shaped MCP transport, tested
-Microsoft authentication and API clients, and a deterministic semantic-model definition and CRUD
-engine. These internal components are not wired to the 18 MCP tool handlers yet, so those tools
+Phases 1 through 4 are implemented. The project now has a production-shaped MCP transport, tested
+Microsoft authentication and API clients, a deterministic semantic-model definition and CRUD
+engine, and a safe Fabric lifecycle orchestration service. These internal components are not wired
+to the 18 MCP tool handlers yet, so those tools
 continue to return a structured `NOT_IMPLEMENTED` result until their corresponding phases are
 implemented.
 
@@ -36,6 +37,13 @@ Available now:
   explicitly non-blocking; Fabric or Power BI remains the authoritative DAX validator.
 - A golden local definition fixture covering Unicode, apostrophes, multiline DAX/M, all supported
   partition sources, calculation groups, hierarchies, relationships, and RLS.
+- Preview-first create, property update, definition mutation, connection binding, and permanent-delete
+  lifecycle operations.
+- Optimistic concurrency through required semantic definition hashes on model updates.
+- Bounded Fabric long-running-operation polling with operation handles returned on timeout.
+- Post-write definition hash and object-count verification.
+- Repeated-ID, exact-name, and explicit irreversible confirmation for permanent deletion.
+- Scoped continuation tokens and bounded model metadata summaries.
 
 ## Requirements
 
@@ -104,6 +112,24 @@ The command requires `MCP_API_KEY`, valid Azure credentials, at least one
 `FABRIC_ALLOWED_WORKSPACE_IDS` entry, and `POWERBI_MCP_READONLY=true`. It refuses to run when
 read-only mode is disabled.
 
+The Phase 4 live lifecycle check is intentionally separate because it creates, mutates, and
+permanently deletes one uniquely named disposable model. Fabric item recovery does not currently
+support semantic models, so the check requires exactly one development workspace, write mode, an
+explicit mutation acknowledgement, and a separate permanent-delete acknowledgement:
+
+```powershell
+$env:PHASE4_LIVE_MUTATION = "true"
+$env:PHASE4_LIVE_PERMANENT_DELETE = "true"
+$env:POWERBI_MCP_READONLY = "false"
+npm run test:live:phase4
+```
+
+The script loads local values from `.env`, previews creation first, verifies representative object
+create/update/delete batches and a stale-hash rejection, then permanently deletes only the model
+created by that run after repeating its ID and exact current name. Its self-contained model has no
+external data source, so connection binding is reported as not applicable. Connection binding is
+covered by unit and real-HTTP end-to-end fixtures.
+
 ## Configuration
 
 | Variable                       |    Required | Default        | Description                                                                      |
@@ -126,6 +152,7 @@ read-only mode is disabled.
 | `HTTP_MAX_RETRIES`             |          No | `2`            | Retry count for explicitly safe reads only.                                      |
 | `HTTP_MAX_PAGES`               |          No | `100`          | Pagination safety limit.                                                         |
 | `HTTP_MAX_RESPONSE_BYTES`      |          No | `10485760`     | Maximum external response body size.                                             |
+| `LRO_POLL_BUDGET_MS`           |          No | `60000`        | Maximum time spent synchronously polling one Fabric long-running operation.      |
 
 Configuration is validated before the server binds a port. Error messages name invalid variables
 but never include their values.
@@ -161,8 +188,8 @@ read-only MCP resources.
 - The MCP service is stateless; no model definitions or credentials are written locally.
 - An empty workspace allowlist denies all Fabric and Power BI client calls.
 - External writes are blocked by default. Unsafe requests are never automatically retried.
-- Phase 2 clients and the Phase 3 model engine are internal boundaries only; no MCP tool can invoke
-  them yet.
+- Phase 2 clients, the Phase 3 model engine, and the Phase 4 lifecycle service are internal
+  boundaries only; MCP tool-handler wiring is Phase 5.
 
 Bearer authentication is the initial Render test boundary. Microsoft Entra protection is planned
 for the later Azure deployment phase.

@@ -304,7 +304,8 @@ describe("ResilientHttpClient", () => {
   it("allows explicitly empty responses and blocks paths that can change origin", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
-      .mockResolvedValue(new Response(undefined, { status: 204 }));
+      .mockResolvedValueOnce(new Response(undefined, { status: 204 }))
+      .mockResolvedValueOnce(response(202, null));
     const { client } = createHarness(fetchMock);
     await expect(
       client.request({
@@ -315,6 +316,17 @@ describe("ResilientHttpClient", () => {
         allowEmptyResponse: true,
       }),
     ).resolves.toMatchObject({ status: 204, data: undefined });
+    await expect(
+      client.request({
+        service: "fabric",
+        operation: "null_empty_ok",
+        method: "POST",
+        path: "/v1/items",
+        responseSchema: z.object({ id: z.string() }),
+        expectedStatuses: [202],
+        allowEmptyResponse: true,
+      }),
+    ).resolves.toMatchObject({ status: 202, data: undefined });
     await expect(
       client.request({
         service: "fabric",

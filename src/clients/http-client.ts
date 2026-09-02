@@ -245,6 +245,10 @@ export class ResilientHttpClient {
       throw this.invalidResponse(request, response, "The response was not valid JSON.", error);
     }
 
+    if (value === null && request.allowEmptyResponse) {
+      return undefined;
+    }
+
     const parsed = request.responseSchema.safeParse(value);
     if (!parsed.success) {
       throw this.invalidResponse(

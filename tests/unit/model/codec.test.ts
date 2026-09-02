@@ -68,6 +68,24 @@ describe("TMSL ModelSpec codec", () => {
     expect(parseTmslDefinition(definition).definitionProperties.version).toBe("5.0");
   });
 
+  it("preserves a valid definition-properties version returned by Fabric", () => {
+    const definition = buildTmslDefinition(loadModelFixture());
+    const properties = {
+      ...DEFAULT_DEFINITION_PBISM,
+      version: "4.2",
+    };
+    definition.parts[1] = encodeDefinitionPart("definition.pbism", JSON.stringify(properties));
+
+    const parsed = parseTmslDefinition(definition);
+
+    expect(parsed.definitionProperties.version).toBe("4.2");
+    expect(
+      parseTmslDefinition(
+        buildTmslDefinition(parsed.model, parsed.definitionProperties, parsed.additionalParts),
+      ).definitionProperties.version,
+    ).toBe("4.2");
+  });
+
   it("preserves optional definition parts across a rebuild", () => {
     const diagram = encodeDefinitionPart("diagramLayout.json", '{"version":"1.1.0"}');
     const definition = buildTmslDefinition(loadModelFixture(), DEFAULT_DEFINITION_PBISM, [diagram]);
@@ -138,7 +156,10 @@ describe("TMSL ModelSpec codec", () => {
     const definition = buildTmslDefinition(loadModelFixture());
     definition.parts[1] = encodeDefinitionPart(
       "definition.pbism",
-      JSON.stringify({ version: "4.0" }),
+      JSON.stringify({
+        ...DEFAULT_DEFINITION_PBISM,
+        version: "not-a-version",
+      }),
     );
     expect(() => parseTmslDefinition(definition)).toThrowError(
       expect.objectContaining({ code: "INVALID_DEFINITION" }),
@@ -171,6 +192,39 @@ describe("TMSL ModelSpec codec", () => {
     expect(() => bimToModelSpec(bim)).toThrowError(
       expect.objectContaining({ code: "UNSUPPORTED_CALCULATION_GROUP" }),
     );
+  });
+
+  it("does not emit unsupported annotations on calculation items", () => {
+    const bim = modelSpecToBim(loadModelFixture());
+    const groupTable = bim.model.tables.find((table) => table.name === "Time Intelligence")!;
+
+    expect(
+      groupTable.calculationGroup?.calculationItems.every(
+        (item) => !Object.hasOwn(item, "annotations"),
+      ),
+    ).toBe(true);
+    expect(groupTable.partitions).toEqual([
+      expect.objectContaining({
+        mode: "import",
+        source: { type: "calculationGroup" },
+      }),
+    ]);
+  });
+
+  it("restores relationship defaults omitted by Fabric readback", () => {
+    const bim = loadModelBimFixture();
+    const relationship = bim.model.relationships[0]! as Partial<
+      (typeof bim.model.relationships)[number]
+    >;
+    delete relationship.fromCardinality;
+    delete relationship.toCardinality;
+    delete relationship.crossFilteringBehavior;
+
+    expect(bimToModelSpec(bim).relationships[0]).toMatchObject({
+      fromCardinality: "many",
+      toCardinality: "one",
+      crossFilteringBehavior: "oneDirection",
+    });
   });
 
   it("fails closed for unknown fields and composite relationships", () => {

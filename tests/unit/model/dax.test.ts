@@ -67,9 +67,20 @@ describe("DAX lint", () => {
     expect(lintDax('VAR Text = "IFERROR / + 0"\n// SUUM()\nRETURN DIVIDE(4, 2)')).toEqual([]);
   });
 
+  it.each([
+    ["newer Microsoft function", "TABLEOF('Sales Data'[Amount])"],
+    ["user-defined function", "Contoso.Analytics.Adjust([Revenue])"],
+  ])("keeps DL008 non-blocking for a %s", (_description, expression) => {
+    const findings = lintDax(expression);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toMatchObject({ ruleId: "DL008", severity: "info", blocking: false });
+    expect(findings[0]?.message).toContain("local advisory DAX function catalog");
+  });
+
   it("sorts findings by severity and handles incomplete calls", () => {
     const findings = lintDax("IFERROR([Revenue] / 0, 0) + 0\nCALCULATE(");
     expect(findings.map((finding) => finding.ruleId)).toEqual(["DL003", "DL004", "DL005"]);
+    expect(findings.every((finding) => !finding.blocking)).toBe(true);
     expect(lintDax("   ")).toEqual([]);
   });
 });

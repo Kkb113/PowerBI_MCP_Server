@@ -18,6 +18,7 @@ export interface DaxToken {
 export interface DaxFinding {
   readonly ruleId: "DL001" | "DL002" | "DL003" | "DL004" | "DL005" | "DL006" | "DL007" | "DL008";
   readonly severity: DaxSeverity;
+  readonly blocking: boolean;
   readonly message: string;
   readonly suggestion: string;
   readonly line: number;
@@ -58,7 +59,7 @@ const daxKeywords = new Set([
   "VAR",
 ]);
 
-const daxFunctions = new Set([
+const knownDaxFunctions = new Set([
   "ABS",
   "ADDCOLUMNS",
   "ALL",
@@ -391,7 +392,8 @@ const finding = (
   suggestion: string,
   line: number,
   object: string | undefined,
-): DaxFinding => ({ ruleId, severity, message, suggestion, line, object });
+  blocking = severity === "error",
+): DaxFinding => ({ ruleId, severity, blocking, message, suggestion, line, object });
 
 export function lintDax(expression: string, object?: string): readonly DaxFinding[] {
   if (expression.trim().length === 0) return [];
@@ -522,7 +524,7 @@ export function lintDax(expression: string, object?: string): readonly DaxFindin
       }
     }
     if (
-      !daxFunctions.has(functionName) &&
+      !knownDaxFunctions.has(functionName) &&
       !daxKeywords.has(functionName) &&
       !variableNames.has(functionName)
     ) {
@@ -530,10 +532,11 @@ export function lintDax(expression: string, object?: string): readonly DaxFindin
         finding(
           "DL008",
           "info",
-          `'${token.value}' is not a recognized DAX function.`,
-          "Check for a typo or verify the function against the DAX reference.",
+          `'${token.value}' is not present in the local advisory DAX function catalog.`,
+          "Check for a typo, then validate newer or user-defined functions against Fabric or Power BI.",
           token.line,
           object,
+          false,
         ),
       );
     }

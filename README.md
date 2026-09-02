@@ -32,6 +32,8 @@ Available now:
   relationships, hierarchies, calculation groups/items, and roles.
 - Semantic invariants, dependency conflict reporting, stable SHA-256 hashes, and semantic diffs.
 - DAX quoting, reference extraction, and advisory lint rules ported from the Python reference.
+- A deliberately partial DAX function catalog whose unknown-function findings are informational and
+  explicitly non-blocking; Fabric or Power BI remains the authoritative DAX validator.
 - A golden local definition fixture covering Unicode, apostrophes, multiline DAX/M, all supported
   partition sources, calculation groups, hierarchies, relationships, and RLS.
 

@@ -42,9 +42,13 @@ malformed base64, invalid JSON, and other extra TMSL fields that do not yet have
 composite relationship payloads are rejected. Expanding the subset requires schema, codec,
 round-trip, diff, and rollback tests in the same change.
 
-DAX lint findings are advisory. Static reference extraction validates common table, column, measure,
+DAX lint findings carry an explicit `blocking` flag and are advisory. The local known-function
+catalog is deliberately partial because Microsoft adds built-in functions and supports user-defined
+functions. `DL008` therefore means only that a call is absent from the local catalog; it is always
+informational and non-blocking. Static reference extraction validates common table, column, measure,
 calculation-group, and RLS references and enables dependency reporting, but it is not presented as a
-complete DAX compiler. Executable DAX validation against Fabric remains a later phase.
+complete DAX compiler. Executable DAX validation against Fabric remains authoritative and belongs to
+a later phase.
 
 ## Consequences
 

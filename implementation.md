@@ -271,6 +271,12 @@ Create a small, testable TypeScript foundation and freeze exactly what the first
 
 ### Phase 2 — Authentication and resilient Fabric/Power BI clients
 
+#### Implementation status
+
+Implemented on 2026-09-02. The credential, transport, Fabric, and Power BI boundaries are covered
+by unit, integration, and real local HTTP end-to-end tests. The live tenant smoke check is an
+explicit, read-only command and is run only when development-tenant credentials are available.
+
 #### Objective
 
 Provide one well-tested boundary around Microsoft authentication and HTTP behavior before adding model logic.
@@ -534,8 +540,13 @@ Deployment is intentionally outside the six implementation phases. Phase 6 only 
 - [Bind a semantic model connection](https://learn.microsoft.com/en-us/rest/api/fabric/semanticmodel/items/bind-semantic-model-connection)
 - [Fabric long-running operations](https://learn.microsoft.com/en-us/rest/api/fabric/articles/long-running-operation)
 - [Fabric identity support](https://learn.microsoft.com/en-us/rest/api/fabric/articles/identity-support)
+- [DefaultAzureCredential for JavaScript](https://learn.microsoft.com/en-us/javascript/api/%40azure/identity/defaultazurecredential)
+- [List Fabric workspaces](https://learn.microsoft.com/en-us/rest/api/fabric/core/workspaces/list-workspaces)
+- [Get Fabric operation state](https://learn.microsoft.com/en-us/rest/api/fabric/core/long-running-operations/get-operation-state)
+- [Get Fabric operation result](https://learn.microsoft.com/en-us/rest/api/fabric/core/long-running-operations/get-operation-result)
 - [Execute DAX queries through Power BI REST](https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/execute-queries-in-group)
 - [Refresh a semantic model](https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/refresh-dataset-in-group)
+- [Get semantic model refresh history](https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/get-refresh-history-in-group)
 - [Inspect refresh execution](https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/get-refresh-execution-details-in-group)
 - [Render Web Services](https://render.com/docs/web-services)
 - [Render free-service limitations](https://render.com/docs/free)

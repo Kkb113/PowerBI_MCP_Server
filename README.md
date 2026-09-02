@@ -6,9 +6,10 @@ project is implemented in strict TypeScript and follows the six-phase plan in
 
 ## Current status
 
-Phase 1 provides the production-shaped transport and frozen MCP contract. It does not call
-Microsoft Fabric and cannot mutate a semantic model yet. All 18 Fabric-facing tools return a
-structured `NOT_IMPLEMENTED` result until their phase is implemented.
+Phases 1 and 2 are implemented. The project now has a production-shaped MCP transport plus tested
+Microsoft authentication, Fabric REST, and Power BI REST client boundaries. The clients are not
+wired to the 18 MCP tool handlers yet, so those tools continue to return a structured
+`NOT_IMPLEMENTED` result until their corresponding phases are implemented.
 
 Available now:
 
@@ -19,6 +20,10 @@ Available now:
 - Frozen tool input/output schemas and safety annotations.
 - Static capability and safety resources.
 - Structured logs with recursive secret redaction.
+- Azure Identity client-secret and `DefaultAzureCredential` authentication modes.
+- Separate cached tokens for the Fabric and Power BI resource scopes.
+- Workspace-allowlisted Fabric and Power BI clients with read-only enforcement.
+- Bounded HTTP timeouts, response sizes, pagination, typed errors, request IDs, and safe retries.
 - Unit, contract, integration, and real MCP-client end-to-end tests.
 
 ## Requirements
@@ -36,7 +41,8 @@ npm ci
 Copy-Item .env.example .env
 ```
 
-Replace `MCP_API_KEY` in `.env` with at least 32 random characters. This project does not load
+Replace `MCP_API_KEY` in `.env` with at least 32 random characters. Configure the Azure and
+workspace variables described below before running a live client check. This project does not load
 `.env` automatically, so export the variables through your shell or process manager before
 starting it. For example:
 
@@ -72,20 +78,41 @@ npm run test:e2e
 
 That test starts the HTTP service on an ephemeral port and uses the official MCP TypeScript client
 to initialize, list tools, list and read resources, and call a placeholder tool through bearer
-authentication.
+authentication. It also runs the Microsoft clients against a real local HTTP fixture to verify
+audience-specific bearer tokens, request serialization, response parsing, and allowlisting.
+
+An opt-in live smoke check performs only workspace and semantic-model reads:
+
+```powershell
+npm run test:live
+```
+
+The command requires `MCP_API_KEY`, valid Azure credentials, at least one
+`FABRIC_ALLOWED_WORKSPACE_IDS` entry, and `POWERBI_MCP_READONLY=true`. It refuses to run when
+read-only mode is disabled.
 
 ## Configuration
 
-| Variable                   | Required | Default         | Description                                |
-| -------------------------- | -------: | --------------- | ------------------------------------------ |
-| `MCP_API_KEY`              |      Yes | None            | Bearer secret with at least 32 characters. |
-| `NODE_ENV`                 |       No | `development`   | `development`, `test`, or `production`.    |
-| `HOST`                     |       No | `0.0.0.0`       | HTTP bind host.                            |
-| `PORT`                     |       No | `3000`          | HTTP port.                                 |
-| `MCP_ALLOWED_HOSTS`        |       No | Local hostnames | Host-header allowlist.                     |
-| `MCP_ALLOWED_ORIGINS`      |       No | Host allowlist  | Browser Origin-hostname allowlist.         |
-| `RENDER_EXTERNAL_HOSTNAME` |       No | None            | Render hostname appended to allowed hosts. |
-| `LOG_LEVEL`                |       No | `info`          | `debug`, `info`, `warn`, or `error`.       |
+| Variable                       |    Required | Default        | Description                                                                      |
+| ------------------------------ | ----------: | -------------- | -------------------------------------------------------------------------------- |
+| `MCP_API_KEY`                  |         Yes | None           | MCP bearer secret with at least 32 characters.                                   |
+| `NODE_ENV`                     |          No | `development`  | `development`, `test`, or `production`.                                          |
+| `HOST`                         |          No | `0.0.0.0`      | HTTP bind host.                                                                  |
+| `PORT`                         |          No | `3000`         | HTTP port.                                                                       |
+| `MCP_ALLOWED_HOSTS`            |          No | Local hosts    | Host-header allowlist.                                                           |
+| `MCP_ALLOWED_ORIGINS`          |          No | Host allowlist | Browser Origin-hostname allowlist.                                               |
+| `RENDER_EXTERNAL_HOSTNAME`     |          No | None           | Render hostname appended to allowed hosts.                                       |
+| `LOG_LEVEL`                    |          No | `info`         | `debug`, `info`, `warn`, or `error`.                                             |
+| `AZURE_AUTH_MODE`              |          No | `auto`         | `auto`, `client-secret`, or `default`.                                           |
+| `AZURE_TENANT_ID`              | Conditional | None           | Tenant UUID; required with client-secret authentication.                         |
+| `AZURE_CLIENT_ID`              | Conditional | None           | Application UUID for Render or managed-identity client UUID for Azure.           |
+| `AZURE_CLIENT_SECRET`          | Conditional | None           | Required for client-secret authentication; keep it in the platform secret store. |
+| `FABRIC_ALLOWED_WORKSPACE_IDS` |          No | Empty          | Comma-separated workspace UUIDs; an empty list denies every workspace.           |
+| `POWERBI_MCP_READONLY`         |          No | `true`         | Blocks create, update, delete, bind, and refresh calls when true.                |
+| `HTTP_TIMEOUT_MS`              |          No | `30000`        | Per-attempt external HTTP timeout.                                               |
+| `HTTP_MAX_RETRIES`             |          No | `2`            | Retry count for explicitly safe reads only.                                      |
+| `HTTP_MAX_PAGES`               |          No | `100`          | Pagination safety limit.                                                         |
+| `HTTP_MAX_RESPONSE_BYTES`      |          No | `10485760`     | Maximum external response body size.                                             |
 
 Configuration is validated before the server binds a port. Error messages name invalid variables
 but never include their values.
@@ -119,7 +146,9 @@ read-only MCP resources.
 - Health and readiness responses expose only a status value.
 - Missing and invalid bearer credentials receive the same response.
 - The MCP service is stateless; no model definitions or credentials are written locally.
-- Phase 1 contains no Fabric or Power BI client and therefore no Fabric mutation path.
+- An empty workspace allowlist denies all Fabric and Power BI client calls.
+- External writes are blocked by default. Unsafe requests are never automatically retried.
+- Phase 2 clients are internal boundaries only; no MCP tool can invoke them yet.
 
 Bearer authentication is the initial Render test boundary. Microsoft Entra protection is planned
 for the later Azure deployment phase.

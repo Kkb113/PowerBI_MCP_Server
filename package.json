@@ -19,9 +19,12 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "vitest run tests/e2e",
+    "test:live": "tsx scripts/live-smoke.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@azure/core-auth": "1.11.0",
+    "@azure/identity": "4.13.2",
     "@modelcontextprotocol/express": "2.0.0",
     "@modelcontextprotocol/node": "2.0.0",
     "@modelcontextprotocol/server": "2.0.0",

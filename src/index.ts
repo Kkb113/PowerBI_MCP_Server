@@ -5,7 +5,13 @@ import { createLogger } from "./logging.js";
 
 async function main(): Promise<void> {
   const config = loadConfig();
-  const logger = createLogger({ level: config.logLevel, knownSecrets: [config.apiKey] });
+  const logger = createLogger({
+    level: config.logLevel,
+    knownSecrets: [
+      config.apiKey,
+      ...(config.azure.clientSecret ? [config.azure.clientSecret] : []),
+    ],
+  });
   const server = await startHttpServer(config, logger);
   let shuttingDown = false;
 

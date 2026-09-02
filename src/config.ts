@@ -9,6 +9,19 @@ const environmentSchema = z.object({
   MCP_ALLOWED_ORIGINS: z.string().optional(),
   RENDER_EXTERNAL_HOSTNAME: z.string().trim().min(1).optional(),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
+  AZURE_AUTH_MODE: z.enum(["auto", "client-secret", "default"]).default("auto"),
+  AZURE_TENANT_ID: z.uuid().optional(),
+  AZURE_CLIENT_ID: z.uuid().optional(),
+  AZURE_CLIENT_SECRET: z.string().min(1).optional(),
+  FABRIC_ALLOWED_WORKSPACE_IDS: z.string().optional(),
+  POWERBI_MCP_READONLY: z
+    .enum(["true", "false"])
+    .transform((value) => value === "true")
+    .default(true),
+  HTTP_TIMEOUT_MS: z.coerce.number().int().min(100).max(120_000).default(30_000),
+  HTTP_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
+  HTTP_MAX_PAGES: z.coerce.number().int().min(1).max(1_000).default(100),
+  HTTP_MAX_RESPONSE_BYTES: z.coerce.number().int().min(1_024).max(52_428_800).default(10_485_760),
 });
 
 export type LogLevel = z.infer<typeof environmentSchema>["LOG_LEVEL"];
@@ -21,6 +34,20 @@ export interface AppConfig {
   readonly allowedHosts: readonly string[];
   readonly allowedOrigins: readonly string[];
   readonly logLevel: LogLevel;
+  readonly azure: {
+    readonly mode: "client-secret" | "default";
+    readonly tenantId?: string;
+    readonly clientId?: string;
+    readonly clientSecret?: string;
+  };
+  readonly allowedWorkspaceIds: readonly string[];
+  readonly readOnly: boolean;
+  readonly http: {
+    readonly timeoutMs: number;
+    readonly maxRetries: number;
+    readonly maxPages: number;
+    readonly maxResponseBytes: number;
+  };
 }
 
 export class ConfigurationError extends Error {
@@ -60,6 +87,38 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     explicitHosts.length > 0 ? [...explicitHosts, ...renderHosts] : [...localHosts, ...renderHosts],
   );
   const explicitOrigins = splitCommaSeparated(parsed.data.MCP_ALLOWED_ORIGINS);
+  const usesClientSecret =
+    parsed.data.AZURE_AUTH_MODE === "client-secret" ||
+    (parsed.data.AZURE_AUTH_MODE === "auto" && parsed.data.AZURE_CLIENT_SECRET !== undefined);
+
+  if (usesClientSecret && (!parsed.data.AZURE_TENANT_ID || !parsed.data.AZURE_CLIENT_ID)) {
+    throw new ConfigurationError([
+      "AZURE_TENANT_ID and AZURE_CLIENT_ID are required when client-secret authentication is selected.",
+    ]);
+  }
+
+  if (parsed.data.AZURE_AUTH_MODE === "client-secret" && !parsed.data.AZURE_CLIENT_SECRET) {
+    throw new ConfigurationError([
+      "AZURE_CLIENT_SECRET is required when AZURE_AUTH_MODE is client-secret.",
+    ]);
+  }
+
+  const allowedWorkspaceIds = splitCommaSeparated(parsed.data.FABRIC_ALLOWED_WORKSPACE_IDS);
+  const invalidWorkspaceIds = allowedWorkspaceIds.filter(
+    (workspaceId) => !z.uuid().safeParse(workspaceId).success,
+  );
+  if (invalidWorkspaceIds.length > 0) {
+    throw new ConfigurationError([
+      `FABRIC_ALLOWED_WORKSPACE_IDS contains ${invalidWorkspaceIds.length} invalid UUID value(s).`,
+    ]);
+  }
+
+  const azure = Object.freeze({
+    mode: usesClientSecret ? ("client-secret" as const) : ("default" as const),
+    ...(parsed.data.AZURE_TENANT_ID ? { tenantId: parsed.data.AZURE_TENANT_ID } : {}),
+    ...(parsed.data.AZURE_CLIENT_ID ? { clientId: parsed.data.AZURE_CLIENT_ID } : {}),
+    ...(parsed.data.AZURE_CLIENT_SECRET ? { clientSecret: parsed.data.AZURE_CLIENT_SECRET } : {}),
+  });
 
   return Object.freeze({
     nodeEnv: parsed.data.NODE_ENV,
@@ -71,5 +130,14 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
       explicitOrigins.length > 0 ? unique(explicitOrigins) : [...allowedHosts],
     ),
     logLevel: parsed.data.LOG_LEVEL,
+    azure,
+    allowedWorkspaceIds: Object.freeze(unique(allowedWorkspaceIds.map((id) => id.toLowerCase()))),
+    readOnly: parsed.data.POWERBI_MCP_READONLY,
+    http: Object.freeze({
+      timeoutMs: parsed.data.HTTP_TIMEOUT_MS,
+      maxRetries: parsed.data.HTTP_MAX_RETRIES,
+      maxPages: parsed.data.HTTP_MAX_PAGES,
+      maxResponseBytes: parsed.data.HTTP_MAX_RESPONSE_BYTES,
+    }),
   });
 }

@@ -14,6 +14,15 @@ export const TEST_CONFIG: AppConfig = Object.freeze({
   allowedHosts: Object.freeze(["127.0.0.1", "localhost"]),
   allowedOrigins: Object.freeze(["127.0.0.1", "localhost"]),
   logLevel: "error",
+  azure: Object.freeze({ mode: "default" }),
+  allowedWorkspaceIds: Object.freeze([]),
+  readOnly: true,
+  http: Object.freeze({
+    timeoutMs: 1_000,
+    maxRetries: 0,
+    maxPages: 10,
+    maxResponseBytes: 1_048_576,
+  }),
 });
 
 export interface TestHttpServer {

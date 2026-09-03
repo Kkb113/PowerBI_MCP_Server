@@ -1,17 +1,18 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
+import type { OAuthTokenVerifier } from "../../src/auth.js";
 import type { AppConfig } from "../../src/config.js";
 import { createHttpApp } from "../../src/http/app.js";
 import { createLogger } from "../../src/logging.js";
 import type { McpToolHandler } from "../../src/services/mcp-workflow-service.js";
 
-export const TEST_API_KEY = "phase-one-test-api-key-000000000000";
+export const TEST_API_KEY = "local-test-api-key-000000000000000";
 
 export const TEST_CONFIG: AppConfig = Object.freeze({
   nodeEnv: "test",
   host: "127.0.0.1",
   port: 0,
-  apiKey: TEST_API_KEY,
+  auth: Object.freeze({ mode: "api-key", apiKey: TEST_API_KEY }),
   allowedHosts: Object.freeze(["127.0.0.1", "localhost"]),
   allowedOrigins: Object.freeze(["127.0.0.1", "localhost"]),
   logLevel: "error",
@@ -33,10 +34,15 @@ export interface TestHttpServer {
   close(): Promise<void>;
 }
 
-const listen = (server: Server): Promise<void> =>
+export interface TestHttpServerOptions {
+  readonly config?: AppConfig;
+  readonly oauthTokenVerifier?: OAuthTokenVerifier;
+}
+
+const listen = (server: Server, host: string): Promise<void> =>
   new Promise((resolve, reject) => {
     server.once("error", reject);
-    server.listen(0, TEST_CONFIG.host, () => {
+    server.listen(0, host, () => {
       server.off("error", reject);
       resolve();
     });
@@ -53,14 +59,22 @@ const defaultHandler: McpToolHandler = {
 
 export async function startTestHttpServer(
   handler: McpToolHandler = defaultHandler,
+  options: TestHttpServerOptions = {},
 ): Promise<TestHttpServer> {
-  const logger = createLogger({ level: "error", knownSecrets: [TEST_API_KEY], sink: () => {} });
-  const server = createServer(createHttpApp(TEST_CONFIG, logger, { handler }));
-  await listen(server);
+  const config = options.config ?? TEST_CONFIG;
+  const knownSecrets = config.auth.mode === "api-key" ? [config.auth.apiKey] : [];
+  const logger = createLogger({ level: "error", knownSecrets, sink: () => {} });
+  const server = createServer(
+    createHttpApp(config, logger, {
+      handler,
+      ...(options.oauthTokenVerifier ? { oauthTokenVerifier: options.oauthTokenVerifier } : {}),
+    }),
+  );
+  await listen(server, config.host);
   const address = server.address() as AddressInfo;
 
   return {
-    baseUrl: `http://${TEST_CONFIG.host}:${address.port}`,
+    baseUrl: `http://${config.host}:${address.port}`,
     close: () =>
       new Promise<void>((resolve, reject) => {
         server.close((error) => {

@@ -20,7 +20,7 @@ async function main(): Promise<void> {
   const logger = createLogger({
     level: "error",
     knownSecrets: [
-      config.apiKey,
+      ...(config.auth.mode === "api-key" ? [config.auth.apiKey] : []),
       ...(config.azure.clientSecret ? [config.azure.clientSecret] : []),
     ],
   });

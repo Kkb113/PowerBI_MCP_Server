@@ -1,7 +1,7 @@
 import { createMcpExpressApp } from "@modelcontextprotocol/express";
 import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
 import type { Request, Response } from "express";
-import { createBearerAuthMiddleware } from "../auth.js";
+import { createMcpAuthMiddleware, type OAuthTokenVerifier } from "../auth.js";
 import type { AppConfig } from "../config.js";
 import type { Logger } from "../logging.js";
 import { createFabricMcpServer } from "../mcp/server.js";
@@ -25,7 +25,7 @@ async function handleMcpRequest(
     handler,
     logger,
     knownSecrets: [
-      config.apiKey,
+      ...(config.auth.mode === "api-key" ? [config.auth.apiKey] : []),
       ...(config.azure.clientSecret ? [config.azure.clientSecret] : []),
     ],
     readOnly: config.readOnly,
@@ -65,6 +65,7 @@ async function handleMcpRequest(
 
 export interface HttpAppOptions {
   readonly handler?: McpToolHandler;
+  readonly oauthTokenVerifier?: OAuthTokenVerifier;
 }
 
 export function createHttpApp(config: AppConfig, logger: Logger, options: HttpAppOptions = {}) {
@@ -91,7 +92,22 @@ export function createHttpApp(config: AppConfig, logger: Logger, options: HttpAp
     response.status(200).json({ status: "ready" });
   });
 
-  app.use("/mcp", createBearerAuthMiddleware(config.apiKey, logger));
+  if (config.auth.mode === "oauth") {
+    const protectedResourceMetadata = Object.freeze({
+      resource: config.auth.resourceUrl,
+      authorization_servers: [config.auth.issuerUrl],
+      scopes_supported: [...config.auth.requiredScopes],
+      bearer_methods_supported: ["header"],
+    });
+    app.get("/.well-known/oauth-protected-resource", (_request, response) => {
+      response.status(200).json(protectedResourceMetadata);
+    });
+    app.get("/.well-known/oauth-protected-resource/mcp", (_request, response) => {
+      response.status(200).json(protectedResourceMetadata);
+    });
+  }
+
+  app.use("/mcp", createMcpAuthMiddleware(config.auth, logger, options.oauthTokenVerifier));
   app.post("/mcp", (request, response) => {
     void handleMcpRequest(request, response, logger, config, handler);
   });

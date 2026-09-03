@@ -5,16 +5,17 @@ refreshing, and permanently deleting Microsoft Fabric semantic models. The servi
 read-only Lakehouse and Warehouse discovery, schema inspection, and bounded table sampling so an
 AI agent can understand source data before constructing a model.
 
-The application is a stateless TypeScript service designed for Linux containers. It supports
-Microsoft Entra service-principal authentication on Render and Azure managed identity on Azure
-Container Apps.
+The application is a stateless TypeScript service designed for Linux containers and compatible
+with standards-compliant MCP clients over Streamable HTTP. MCP client authentication is independent
+from the Microsoft Entra identity used to call Fabric: production deployments use OAuth protected-
+resource discovery, while a static bearer key remains available for controlled private testing.
 
 ## Capabilities
 
 - Streamable HTTP MCP transport at `POST /mcp`.
 - Health and readiness probes at `GET /health` and `GET /ready`.
-- Bearer authentication, host validation, browser-origin validation, and secret-safe structured
-  logging.
+- OAuth protected-resource discovery, JWT validation through remote JWKS, optional private API-key
+  authentication, host/origin validation, and secret-safe structured logging.
 - Runtime workspace discovery governed by Entra and Fabric permissions; no workspace ID is stored
   in application configuration.
 - Semantic-model creation, property updates, definition reads, atomic object CRUD, connection
@@ -34,7 +35,8 @@ Container Apps.
 
 ```mermaid
 flowchart LR
-    Agent[AI agent or MCP client] -->|HTTPS and bearer token| HTTP[Express HTTP boundary]
+    Agent[Standards-compliant MCP client] -->|Streamable HTTP and OAuth access token| HTTP[Express HTTP boundary]
+    Auth[OAuth authorization server] -->|JWKS and access-token trust| HTTP
     HTTP --> MCP[MCP registry and workflow router]
     MCP --> Lifecycle[Semantic-model lifecycle service]
     MCP --> Data[Fabric data inspection service]
@@ -48,10 +50,11 @@ flowchart LR
     SQL --> Entra
 ```
 
-The HTTP boundary authenticates every MCP request before invoking a tool. The workflow layer
-applies safety policies and delegates to typed services. Microsoft remains authoritative for
-workspace, item, model, and SQL authorization. The process writes no credentials, model state, or
-query results to local storage.
+The HTTP boundary authenticates every MCP request before invoking a tool. This client-facing OAuth
+boundary is separate from the server's Entra credential, which authenticates outbound Fabric,
+Power BI, and SQL calls. The workflow layer applies safety policies and delegates to typed services.
+Microsoft remains authoritative for workspace, item, model, and SQL authorization. The process
+writes no credentials, model state, or query results to local storage.
 
 ### Repository layout
 
@@ -105,8 +108,9 @@ npm ci
 Copy-Item .env.example .env
 ```
 
-Populate `.env` with a strong `MCP_API_KEY` and the appropriate Entra settings. The application does
-not automatically read `.env`; use a secret-aware process manager or Node's environment-file option:
+For local testing, leave `MCP_AUTH_MODE=api-key`, populate a strong `MCP_API_KEY`, and set the
+appropriate Entra settings. The application does not automatically read `.env`; use a secret-aware
+process manager or Node's environment-file option:
 
 ```powershell
 npm run build
@@ -120,7 +124,7 @@ running:
 npm run dev
 ```
 
-The default local endpoint is `http://localhost:3000/mcp`. MCP requests require:
+The default local endpoint is `http://localhost:3000/mcp`. In API-key mode, requests require:
 
 ```text
 Authorization: Bearer <MCP_API_KEY>
@@ -131,30 +135,35 @@ Authorization: Bearer <MCP_API_KEY>
 All production configuration is supplied at runtime. Never commit `.env`, credentials, access
 tokens, Fabric item IDs, or workspace IDs.
 
-| Variable                   |    Required | Default           | Description                                                                                              |
-| -------------------------- | ----------: | ----------------- | -------------------------------------------------------------------------------------------------------- |
-| `MCP_API_KEY`              |         Yes | None              | Bearer secret with at least 32 characters. Generate and store it in the hosting platform's secret store. |
-| `NODE_ENV`                 |          No | `development`     | Runtime mode: `development`, `test`, or `production`.                                                    |
-| `HOST`                     |          No | `0.0.0.0`         | HTTP bind host.                                                                                          |
-| `PORT`                     |          No | `3000`            | HTTP listening port. Render supplies this automatically.                                                 |
-| `MCP_ALLOWED_HOSTS`        |          No | Local hosts       | Comma-separated hostnames without schemes or ports.                                                      |
-| `MCP_ALLOWED_ORIGINS`      |          No | Allowed hosts     | Comma-separated browser Origin hostnames without schemes or ports.                                       |
-| `RENDER_EXTERNAL_HOSTNAME` |      Render | Platform supplied | Render hostname automatically added to allowed hosts.                                                    |
-| `LOG_LEVEL`                |          No | `info`            | `debug`, `info`, `warn`, or `error`.                                                                     |
-| `AZURE_AUTH_MODE`          |          No | `auto`            | `client-secret`, `default`, or `auto`. `auto` selects client-secret mode when a client secret exists.    |
-| `AZURE_TENANT_ID`          | Conditional | None              | Tenant UUID for client-secret authentication.                                                            |
-| `AZURE_CLIENT_ID`          | Conditional | None              | Application UUID, or user-assigned managed-identity client UUID.                                         |
-| `AZURE_CLIENT_SECRET`      | Conditional | None              | Required in client-secret mode. Store only as a platform secret.                                         |
-| `POWERBI_MCP_READONLY`     |          No | `true`            | Blocks applied create, update, delete, bind, and refresh operations when `true`.                         |
-| `HTTP_TIMEOUT_MS`          |          No | `30000`           | Per-attempt Microsoft API and SQL timeout.                                                               |
-| `HTTP_MAX_RETRIES`         |          No | `2`               | Retry count for operations explicitly classified as safe.                                                |
-| `HTTP_MAX_PAGES`           |          No | `100`             | Maximum Microsoft API pages followed by one request.                                                     |
-| `HTTP_MAX_RESPONSE_BYTES`  |          No | `10485760`        | Maximum Microsoft API response body size.                                                                |
-| `LRO_POLL_BUDGET_MS`       |          No | `60000`           | Maximum synchronous Fabric long-running-operation polling time.                                          |
-| `DAX_MAX_ROWS`             |          No | `1000`            | Maximum DAX rows returned by the server.                                                                 |
-| `DAX_MAX_RESPONSE_BYTES`   |          No | `1048576`         | Maximum serialized DAX response size.                                                                    |
-| `DATA_MAX_ROWS`            |          No | `100`             | Maximum Lakehouse/Warehouse sample rows returned by the server.                                          |
-| `DATA_MAX_RESPONSE_BYTES`  |          No | `1048576`         | Maximum serialized data-inspection response size.                                                        |
+| Variable                    |    Required | Default       | Description                                                                                            |
+| --------------------------- | ----------: | ------------- | ------------------------------------------------------------------------------------------------------ |
+| `MCP_AUTH_MODE`             |          No | `api-key`     | MCP client authentication: `api-key` for private use or `oauth` for standards-based remote deployment. |
+| `MCP_API_KEY`               | Conditional | None          | Bearer secret of at least 32 characters; required only in `api-key` mode.                              |
+| `MCP_PUBLIC_BASE_URL`       |       OAuth | None          | Canonical public HTTPS origin, without a path. The server derives `/mcp` and discovery URLs from it.   |
+| `MCP_OAUTH_ISSUER_URL`      |       OAuth | None          | Issuer identifier for the external OAuth authorization server.                                         |
+| `MCP_OAUTH_JWKS_URL`        |       OAuth | None          | HTTPS JWKS endpoint used to verify access-token signatures.                                            |
+| `MCP_OAUTH_AUDIENCE`        |       OAuth | None          | Required access-token audience for this MCP resource server.                                           |
+| `MCP_OAUTH_REQUIRED_SCOPES` |       OAuth | None          | Comma-separated scopes every MCP access token must grant.                                              |
+| `NODE_ENV`                  |          No | `development` | Runtime mode: `development`, `test`, or `production`.                                                  |
+| `HOST`                      |          No | `0.0.0.0`     | HTTP bind host.                                                                                        |
+| `PORT`                      |          No | `3000`        | HTTP listening port; hosting platforms may inject this value.                                          |
+| `MCP_ALLOWED_HOSTS`         |          No | Local hosts   | Comma-separated hostnames without schemes or ports.                                                    |
+| `MCP_ALLOWED_ORIGINS`       |          No | Allowed hosts | Comma-separated browser Origin hostnames without schemes or ports.                                     |
+| `LOG_LEVEL`                 |          No | `info`        | `debug`, `info`, `warn`, or `error`.                                                                   |
+| `AZURE_AUTH_MODE`           |          No | `auto`        | `client-secret`, `default`, or `auto`. `auto` selects client-secret mode when a client secret exists.  |
+| `AZURE_TENANT_ID`           | Conditional | None          | Tenant UUID for client-secret authentication.                                                          |
+| `AZURE_CLIENT_ID`           | Conditional | None          | Application UUID, or user-assigned managed-identity client UUID.                                       |
+| `AZURE_CLIENT_SECRET`       | Conditional | None          | Required in client-secret mode. Store only as a platform secret.                                       |
+| `POWERBI_MCP_READONLY`      |          No | `true`        | Blocks applied create, update, delete, bind, and refresh operations when `true`.                       |
+| `HTTP_TIMEOUT_MS`           |          No | `30000`       | Per-attempt Microsoft API and SQL timeout.                                                             |
+| `HTTP_MAX_RETRIES`          |          No | `2`           | Retry count for operations explicitly classified as safe.                                              |
+| `HTTP_MAX_PAGES`            |          No | `100`         | Maximum Microsoft API pages followed by one request.                                                   |
+| `HTTP_MAX_RESPONSE_BYTES`   |          No | `10485760`    | Maximum Microsoft API response body size.                                                              |
+| `LRO_POLL_BUDGET_MS`        |          No | `60000`       | Maximum synchronous Fabric long-running-operation polling time.                                        |
+| `DAX_MAX_ROWS`              |          No | `1000`        | Maximum DAX rows returned by the server.                                                               |
+| `DAX_MAX_RESPONSE_BYTES`    |          No | `1048576`     | Maximum serialized DAX response size.                                                                  |
+| `DATA_MAX_ROWS`             |          No | `100`         | Maximum Lakehouse/Warehouse sample rows returned by the server.                                        |
+| `DATA_MAX_RESPONSE_BYTES`   |          No | `1048576`     | Maximum serialized data-inspection response size.                                                      |
 
 Configuration is validated before the server binds a port. Validation messages identify invalid
 variable names without returning their values.
@@ -163,6 +172,39 @@ variable names without returning their values.
 
 The server publishes 25 tools. Input schemas, read/write classifications, and safety annotations
 are defined centrally in `src/mcp/registry.ts` and protected by contract tests.
+
+### Client authentication and interoperability
+
+`MCP_AUTH_MODE=oauth` is the production mode for remote MCP clients. It publishes RFC 9728
+protected-resource metadata at both of the MCP discovery locations below and includes the
+path-specific metadata URL in unauthenticated `WWW-Authenticate` responses:
+
+```text
+GET /.well-known/oauth-protected-resource
+GET /.well-known/oauth-protected-resource/mcp
+```
+
+The configured authorization server must publish OAuth authorization-server metadata, support
+authorization-code flow with S256 PKCE, issue JWT access tokens for `MCP_OAUTH_AUDIENCE`, and expose
+the configured JWKS endpoint. For broad client interoperability, it must also support an MCP client
+registration method such as pre-registration or Client ID Metadata Documents. These provider
+capabilities are external to this resource server.
+
+The server validates the JWT signature, algorithm, issuer, audience, lifetime, and required scopes
+before MCP processing. It accepts standard `scope` claims and Microsoft-compatible `scp` claims.
+`MCP_AUTH_MODE=api-key` intentionally remains available for local checks and private integrations,
+but static bearer keys do not provide interoperable OAuth authorization for public MCP clients.
+
+Do not expose `AZURE_CLIENT_SECRET` to MCP clients. The `AZURE_*` identity is the server's outbound
+Fabric identity, not an MCP OAuth client credential. If Microsoft Entra is also selected as the MCP
+authorization server, configure a separately exposed API audience and delegated scope and
+pre-register every client that requires it. Environments requiring dynamic MCP client onboarding
+should use an authorization server or identity gateway that advertises the corresponding MCP client
+registration capability and can federate to the organization's identity provider.
+
+The implementation uses the official MCP TypeScript SDK and negotiates supported protocol versions
+through the Streamable HTTP transport. Any client must itself support the negotiated MCP protocol,
+Streamable HTTP, and the configured authorization-server flow.
 
 ### Discovery and source inspection
 
@@ -286,26 +328,30 @@ The same Docker image is used for Render and Azure Container Apps. Follow
 ### Render summary
 
 1. Create a Blueprint or Docker web service from `render.yaml`.
-2. Set `MCP_API_KEY`, `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, and `AZURE_CLIENT_SECRET` as secrets.
-3. Leave `POWERBI_MCP_READONLY=true` for initial validation.
-4. Verify `/health`, `/ready`, bearer rejection, MCP initialization, and read-only Fabric discovery.
-5. Enable mutation only after authorization and rollback procedures have been approved.
+2. Set `MCP_PUBLIC_BASE_URL` to the service's public HTTPS origin and configure the OAuth issuer,
+   JWKS, audience, and required scopes. No Render URL is present in the application image.
+3. Set `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, and `AZURE_CLIENT_SECRET` as secrets for outbound
+   Microsoft API access.
+4. Leave `POWERBI_MCP_READONLY=true` for initial validation.
+5. Verify `/health`, `/ready`, OAuth discovery, bearer rejection, MCP initialization, and read-only
+   Fabric discovery.
+6. Enable mutation only after authorization and rollback procedures have been approved.
 
 Do not configure a workspace ID on Render. Fabric workspace membership assigned to the Entra
 application is the authorization boundary.
 
 ### Azure summary
 
-Use the same image with Azure Container Apps. Prefer `AZURE_AUTH_MODE=default` and a managed identity
-instead of a client secret. Store the MCP bearer key in a secret reference or Azure Key Vault and
-grant Fabric workspace/item permissions directly to the managed identity.
+Use the same image with Azure Container Apps. Change only `MCP_PUBLIC_BASE_URL` when the public
+origin changes. Prefer `AZURE_AUTH_MODE=default` and a managed identity instead of a client secret,
+and grant Fabric workspace/item permissions directly to that identity.
 
 ## Security considerations
 
 - Use least-privilege Fabric workspace and item permissions.
 - Keep the service in read-only mode unless approved mutation workflows are required.
-- Rotate the MCP bearer key and Entra secret through the hosting platform; restart instances after
-  rotation.
+- Rotate OAuth signing keys through the authorization server and rotate any API key or Entra secret
+  through the hosting platform; restart instances after changing runtime configuration.
 - Restrict public ingress, allowed hosts, and browser origins to the intended MCP clients.
 - Terminate TLS at the hosting platform. Never expose the service over plaintext public HTTP.
 - Do not log or include credentials, access tokens, connection secrets, model definitions, DAX row
@@ -352,6 +398,7 @@ applies lower configurable response limits and reports partial/truncated results
 - `THIRD_PARTY_NOTICES.md` — notices for incorporated runtime dependencies
 
 Microsoft API contracts and operational requirements are documented in the
+[MCP authorization specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization),
 [Fabric REST API overview](https://learn.microsoft.com/en-us/rest/api/fabric/articles/),
 [Fabric identity support](https://learn.microsoft.com/en-us/rest/api/fabric/articles/identity-support),
 [semantic-model definition contract](https://learn.microsoft.com/en-us/rest/api/fabric/articles/item-management/definitions/semantic-model-definition),

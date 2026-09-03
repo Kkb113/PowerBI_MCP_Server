@@ -2,7 +2,7 @@
 
 ## Release
 
-- Version: `1.0.0`
+- Version: `1.1.0`
 - Verification date: 2026-09-03
 - Runtime: Node.js `24.14.0`
 - MCP contract: 25 tools and two read-only resources
@@ -16,7 +16,7 @@ MCP-client end-to-end tests, coverage thresholds, and the production build.
 
 | Risk or behavior                                                 | Automated evidence                                                   |
 | ---------------------------------------------------------------- | -------------------------------------------------------------------- |
-| Authentication and request-boundary validation                   | `tests/integration/http.test.ts`, `tests/integration/server.test.ts` |
+| Authentication and request-boundary validation                   | HTTP integration tests and `tests/e2e/oauth-mcp.test.ts`             |
 | Host and browser-origin enforcement                              | `tests/integration/http.test.ts`, `tests/unit/config.test.ts`        |
 | Secret and response redaction                                    | `tests/unit/logging.test.ts`, `tests/e2e/mcp.test.ts`                |
 | Entra token audience separation and caching                      | `tests/unit/identity.test.ts`, `tests/e2e/microsoft-clients.test.ts` |
@@ -41,12 +41,16 @@ authenticated MCP discovery, restart recovery, secret-free logs, and graceful SI
 
 ## Verified results
 
-The production `1.0.0` tree passed the following checks on 2026-09-03:
+The production `1.1.0` tree passed the following checks on 2026-09-03:
 
-- `npm run check`: 23 test files and 191 tests passed; line coverage was 94.57%; the production
+- `npm run check`: 24 test files and 196 tests passed; line coverage was 94.49%; the production
   TypeScript build completed successfully.
 - `npm run test:container`: Node.js `v24.14.0`, UID `1000`, 25 tools, two resources, restart, and
   graceful shutdown checks passed; the production dependency audit reported no vulnerabilities.
+- OAuth interoperability verification covered both MCP protected-resource metadata routes,
+  standards-compliant bearer challenges, required-scope enforcement, protocol initialization, tool
+  discovery, and signed-JWT verification against a remote JWKS. API-key compatibility remained
+  covered by the existing HTTP, MCP, and container gates.
 - `npm run test:live:data`: the configured service principal discovered three authorized
   workspaces, 27 Lakehouses, and two Warehouses; listed nine Lakehouse tables; inspected 25 SQL
   endpoint columns; and completed a bounded one-column, one-row sample without exposing IDs,
@@ -99,7 +103,10 @@ failed cleanup fails the verification and must be resolved before deployment.
 Deployment acceptance requires all of the following:
 
 - `/health` and `/ready` return HTTP 200 and reveal only service status.
-- `/mcp` returns HTTP 401 without the bearer secret and initializes with the correct secret.
+- `/mcp` returns HTTP 401 without credentials and initializes with the configured API key in private
+  compatibility mode or a valid audience- and scope-bound JWT in OAuth mode.
+- OAuth mode publishes root and path-specific protected-resource metadata using only the configured
+  canonical public origin.
 - The server publishes exactly 25 tools and two read-only resources.
 - Workspace discovery is limited to the Entra identity's Fabric permissions.
 - Read-only mode blocks every applied create, update, delete, bind, and refresh workflow.

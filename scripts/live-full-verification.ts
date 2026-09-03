@@ -200,6 +200,10 @@ async function runLifecycle(
   logger: Logger,
   workspaceId: string,
 ): Promise<Readonly<Record<string, JsonValue>>> {
+  if (config.auth.mode !== "api-key") {
+    throw new Error("Live MCP lifecycle verification requires MCP_AUTH_MODE=api-key.");
+  }
+  const apiKey = config.auth.apiKey;
   const server = createServer(createHttpApp(config, logger));
   const client = new Client({ name: `full-live-check-${run}`, version: "1.0.0" });
   const suffix = `${new Date().toISOString().replaceAll(/[-:.TZ]/gu, "")}-${randomUUID().slice(0, 8)}`;
@@ -235,7 +239,7 @@ async function runLifecycle(
     const address = server.address() as AddressInfo;
     await client.connect(
       new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${address.port}/mcp`), {
-        authProvider: { token: () => Promise.resolve(config.apiKey) },
+        authProvider: { token: () => Promise.resolve(apiKey) },
       }),
     );
     connected = true;
@@ -524,6 +528,11 @@ async function main(): Promise<void> {
     ]);
   }
   const config = loadConfig();
+  if (config.auth.mode !== "api-key") {
+    throw new ConfigurationError([
+      "MCP_AUTH_MODE must be api-key for the local full MCP verification check.",
+    ]);
+  }
   if (config.readOnly) {
     throw new ConfigurationError([
       "POWERBI_MCP_READONLY must be false for the disposable full verification check.",
@@ -534,7 +543,7 @@ async function main(): Promise<void> {
   const logger = createLogger({
     level: config.logLevel,
     knownSecrets: [
-      config.apiKey,
+      config.auth.apiKey,
       ...(config.azure.clientSecret ? [config.azure.clientSecret] : []),
     ],
   });

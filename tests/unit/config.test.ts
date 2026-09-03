@@ -15,7 +15,7 @@ describe("loadConfig", () => {
     });
     expect(config.allowedHosts).toEqual(["localhost", "127.0.0.1", "[::1]"]);
     expect(config.allowedOrigins).toEqual(config.allowedHosts);
-    expect(config.apiKey).toBe(apiKey);
+    expect(config.auth).toEqual({ mode: "api-key", apiKey });
     expect(config.azure).toEqual({ mode: "default" });
     expect(config.readOnly).toBe(true);
     expect(config.http).toEqual({
@@ -28,6 +28,15 @@ describe("loadConfig", () => {
     expect(config.dax).toEqual({ maxRows: 1_000, maxResponseBytes: 1_048_576 });
     expect(config.data).toEqual({ maxRows: 100, maxResponseBytes: 1_048_576 });
     expect(Object.isFrozen(config)).toBe(true);
+  });
+
+  it("uses the portable public origin for the API-key host allowlist", () => {
+    const config = loadConfig({
+      MCP_API_KEY: apiKey,
+      MCP_PUBLIC_BASE_URL: "https://temporary-host.example.test",
+    });
+
+    expect(config.allowedHosts).toContain("temporary-host.example.test");
   });
 
   it("loads client-secret authentication and bounded HTTP and data controls", () => {
@@ -95,16 +104,47 @@ describe("loadConfig", () => {
     ).not.toThrow();
   });
 
-  it("adds the Render hostname and removes duplicate allowlist entries", () => {
+  it("loads portable OAuth resource-server settings and derives the public MCP URLs", () => {
     const config = loadConfig({
-      MCP_API_KEY: apiKey,
+      NODE_ENV: "production",
+      MCP_AUTH_MODE: "oauth",
+      MCP_PUBLIC_BASE_URL: "https://mcp.example.test/",
+      MCP_OAUTH_ISSUER_URL: "https://identity.example.test/",
+      MCP_OAUTH_JWKS_URL: "https://identity.example.test/.well-known/jwks.json",
+      MCP_OAUTH_AUDIENCE: "https://mcp.example.test/mcp",
+      MCP_OAUTH_REQUIRED_SCOPES: "fabric.read,fabric.write,fabric.read",
       MCP_ALLOWED_HOSTS: "localhost,api.example.test,localhost",
       MCP_ALLOWED_ORIGINS: "app.example.test",
-      RENDER_EXTERNAL_HOSTNAME: "service.onrender.com",
     });
 
-    expect(config.allowedHosts).toEqual(["localhost", "api.example.test", "service.onrender.com"]);
+    expect(config.auth).toEqual({
+      mode: "oauth",
+      publicBaseUrl: "https://mcp.example.test",
+      resourceUrl: "https://mcp.example.test/mcp",
+      protectedResourceMetadataUrl:
+        "https://mcp.example.test/.well-known/oauth-protected-resource/mcp",
+      issuerUrl: "https://identity.example.test/",
+      jwksUrl: "https://identity.example.test/.well-known/jwks.json",
+      audience: "https://mcp.example.test/mcp",
+      requiredScopes: ["fabric.read", "fabric.write"],
+    });
+    expect(config.allowedHosts).toEqual(["localhost", "api.example.test", "mcp.example.test"]);
     expect(config.allowedOrigins).toEqual(["app.example.test"]);
+  });
+
+  it("requires complete OAuth settings and secure production URLs", () => {
+    expect(() => loadConfig({ MCP_AUTH_MODE: "oauth" })).toThrowError(ConfigurationError);
+    expect(() =>
+      loadConfig({
+        NODE_ENV: "production",
+        MCP_AUTH_MODE: "oauth",
+        MCP_PUBLIC_BASE_URL: "http://mcp.example.test",
+        MCP_OAUTH_ISSUER_URL: "https://identity.example.test",
+        MCP_OAUTH_JWKS_URL: "https://identity.example.test/jwks",
+        MCP_OAUTH_AUDIENCE: "mcp-api",
+        MCP_OAUTH_REQUIRED_SCOPES: "fabric.read",
+      }),
+    ).toThrowError(ConfigurationError);
   });
 
   it("fails fast with field names but without configured values", () => {

@@ -12,6 +12,8 @@ services:
         value: 0.0.0.0
       - key: LOG_LEVEL
         value: info
+      - key: MCP_AUTH_MODE
+        value: oauth
       - key: AZURE_AUTH_MODE
         value: client-secret
       - key: POWERBI_MCP_READONLY
@@ -34,7 +36,15 @@ services:
         value: "100"
       - key: DATA_MAX_RESPONSE_BYTES
         value: "1048576"
-      - key: MCP_API_KEY
+      - key: MCP_PUBLIC_BASE_URL
+        sync: false
+      - key: MCP_OAUTH_ISSUER_URL
+        sync: false
+      - key: MCP_OAUTH_JWKS_URL
+        sync: false
+      - key: MCP_OAUTH_AUDIENCE
+        sync: false
+      - key: MCP_OAUTH_REQUIRED_SCOPES
         sync: false
       - key: AZURE_TENANT_ID
         sync: false

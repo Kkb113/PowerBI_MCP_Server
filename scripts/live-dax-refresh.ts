@@ -120,6 +120,12 @@ async function main(): Promise<void> {
     ]);
   }
   const config = loadConfig();
+  if (config.auth.mode !== "api-key") {
+    throw new ConfigurationError([
+      "MCP_AUTH_MODE must be api-key for the local DAX and refresh MCP verification check.",
+    ]);
+  }
+  const apiKey = config.auth.apiKey;
   if (config.readOnly) {
     throw new ConfigurationError([
       "POWERBI_MCP_READONLY must be false for the disposable DAX and refresh live check.",
@@ -128,7 +134,7 @@ async function main(): Promise<void> {
   const workspaceId = requireLiveTestWorkspaceId();
 
   const knownSecrets = [
-    config.apiKey,
+    config.auth.apiKey,
     ...(config.azure.clientSecret ? [config.azure.clientSecret] : []),
   ];
   const logger = createLogger({ level: config.logLevel, knownSecrets });
@@ -155,7 +161,7 @@ async function main(): Promise<void> {
     const address = server.address() as AddressInfo;
     await client.connect(
       new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${address.port}/mcp`), {
-        authProvider: { token: () => Promise.resolve(config.apiKey) },
+        authProvider: { token: () => Promise.resolve(apiKey) },
       }),
     );
     connected = true;

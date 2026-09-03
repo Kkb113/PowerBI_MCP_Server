@@ -27,21 +27,27 @@ restart recovery, secret-free logs, and clean SIGTERM shutdown.
 
 ## Runtime configuration
 
-Set configuration only at runtime. Never pass Azure credentials or `MCP_API_KEY` as Docker build
-arguments.
+Set configuration only at runtime. Never pass OAuth settings, API keys, or Azure credentials as
+Docker build arguments. The canonical public origin is configuration, not application code, so the
+same image can move between hosting platforms without rebuilding.
 
-| Variable               | Render                      | Azure Container Apps                                     |
-| ---------------------- | --------------------------- | -------------------------------------------------------- |
-| `NODE_ENV`             | `production`                | `production`                                             |
-| `HOST`                 | `0.0.0.0`                   | `0.0.0.0`                                                |
-| `PORT`                 | Use Render's injected value | `3000`; ingress target port `3000`                       |
-| `MCP_API_KEY`          | Secret                      | Secret reference or Key Vault reference                  |
-| `AZURE_AUTH_MODE`      | `client-secret`             | `default` for managed identity                           |
-| `AZURE_TENANT_ID`      | Secret environment value    | Omit for system-assigned managed identity                |
-| `AZURE_CLIENT_ID`      | Secret environment value    | Omit for system-assigned; set for user-assigned identity |
-| `AZURE_CLIENT_SECRET`  | Secret                      | Omit when using managed identity                         |
-| `POWERBI_MCP_READONLY` | Start with `true`           | Start with `true`                                        |
-| `LOG_LEVEL`            | `info`                      | `info`                                                   |
+| Variable                    | Render                      | Azure Container Apps                                     |
+| --------------------------- | --------------------------- | -------------------------------------------------------- |
+| `NODE_ENV`                  | `production`                | `production`                                             |
+| `HOST`                      | `0.0.0.0`                   | `0.0.0.0`                                                |
+| `PORT`                      | Use Render's injected value | `3000`; ingress target port `3000`                       |
+| `MCP_AUTH_MODE`             | `oauth`                     | `oauth`                                                  |
+| `MCP_PUBLIC_BASE_URL`       | Public service origin       | Public ingress or custom-domain origin                   |
+| `MCP_OAUTH_ISSUER_URL`      | Authorization-server issuer | Authorization-server issuer                              |
+| `MCP_OAUTH_JWKS_URL`        | Authorization-server JWKS   | Authorization-server JWKS                                |
+| `MCP_OAUTH_AUDIENCE`        | MCP resource audience       | MCP resource audience                                    |
+| `MCP_OAUTH_REQUIRED_SCOPES` | Required MCP scopes         | Required MCP scopes                                      |
+| `AZURE_AUTH_MODE`           | `client-secret`             | `default` for managed identity                           |
+| `AZURE_TENANT_ID`           | Secret environment value    | Omit for system-assigned managed identity                |
+| `AZURE_CLIENT_ID`           | Secret environment value    | Omit for system-assigned; set for user-assigned identity |
+| `AZURE_CLIENT_SECRET`       | Secret                      | Omit when using managed identity                         |
+| `POWERBI_MCP_READONLY`      | Start with `true`           | Start with `true`                                        |
+| `LOG_LEVEL`                 | `info`                      | `info`                                                   |
 
 Keep the remaining timeout, pagination, polling, DAX, and data-inspection limits at the values in
 `.env.example` unless a measured live test justifies changing one. Workspace access comes entirely
@@ -55,25 +61,31 @@ service, uses `/health`, allows 30 seconds for graceful shutdown, and prompts fo
 or tenant-specific value instead of committing it.
 
 1. Create a new Render Blueprint from this repository and select `render.yaml`.
-2. Enter strong values for `MCP_API_KEY`, `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, and
-   `AZURE_CLIENT_SECRET`. No workspace-ID environment variable is used.
+2. Enter `MCP_PUBLIC_BASE_URL` as the deployed HTTPS origin. Configure the OAuth issuer, JWKS,
+   audience, and required scope values issued for this MCP resource. The Blueprint contains no
+   service-specific hostname.
+3. Enter strong values for `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, and `AZURE_CLIENT_SECRET`. These
+   outbound Microsoft credentials are independent from MCP client OAuth. No workspace-ID
+   environment variable is used.
    Confirm the tenant setting **Service principals can use Fabric APIs** is enabled and assign the
    application only the Fabric workspace/item roles it needs.
-3. Leave `POWERBI_MCP_READONLY=true` for the initial deployment. Render provides `PORT` and
-   `RENDER_EXTERNAL_HOSTNAME`; the server adds the external hostname to its host allowlist.
-4. Wait for the deployment and `/health` check to succeed. Verify `GET /ready` returns HTTP 200.
-5. Connect an MCP client to `https://<service-host>/mcp` with
-   `Authorization: Bearer <MCP_API_KEY>`. Verify initialization, tool discovery, and read-only
-   workspace, model, Lakehouse, and Warehouse listing.
+4. Leave `POWERBI_MCP_READONLY=true` for the initial deployment. The hostname from
+   `MCP_PUBLIC_BASE_URL` is added to the host allowlist automatically.
+5. Wait for the deployment and `/health` check to succeed. Verify `GET /ready` returns HTTP 200 and
+   both protected-resource metadata routes return the configured resource and authorization server.
+6. Connect a standards-compliant MCP client to `https://<service-host>/mcp` through the configured
+   OAuth authorization flow. Verify initialization, tool discovery, and read-only workspace, model,
+   Lakehouse, and Warehouse listing.
    Schema inspection and table sampling additionally require outbound TCP `1433` from Render to
    `*.datawarehouse.fabric.microsoft.com` and SQL access for the service principal.
-6. Change `POWERBI_MCP_READONLY` to `false` only for a controlled disposable lifecycle test. Keep
+7. Change `POWERBI_MCP_READONLY` to `false` only for a controlled disposable lifecycle test. Keep
    the Entra application assigned only to intended non-production workspaces and restore read-only
    mode afterward if hosted writes are no longer required.
 
 Do not attach a persistent disk. Roll back by selecting the last passing deployment in Render,
-then verify `/health`, `/ready`, and authenticated MCP discovery again. Rotating `MCP_API_KEY` or
-the Entra client secret requires a service restart but no data migration.
+then verify `/health`, `/ready`, OAuth metadata, and authenticated MCP discovery again. Changing the
+canonical origin, OAuth trust settings, or Entra client secret requires a service restart but no data
+migration.
 
 Render's current Docker and Blueprint documentation is authoritative for platform behavior:
 
@@ -90,20 +102,21 @@ deployment checklist, not infrastructure automation:
 2. Create or update one Container App with external HTTPS ingress and target port `3000`.
 3. Set `PORT=3000`, configure an HTTP liveness probe on `/health`, and configure an HTTP readiness
    probe on `/ready`, both on port `3000`.
-4. Begin with one active revision, one minimum replica, and one maximum replica. Adjust scaling
+4. Set `MCP_AUTH_MODE=oauth`, set `MCP_PUBLIC_BASE_URL` to the Azure ingress or custom-domain origin,
+   and supply the authorization-server issuer, JWKS, audience, and required scopes.
+5. Begin with one active revision, one minimum replica, and one maximum replica. Adjust scaling
    only after measuring request concurrency and Fabric throttling.
-5. Enable a system-assigned managed identity. Set `AZURE_AUTH_MODE=default` and omit
+6. Enable a system-assigned managed identity. Set `AZURE_AUTH_MODE=default` and omit
    `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, and `AZURE_CLIENT_SECRET`. For a user-assigned identity,
    set only its client ID when required by Azure Identity.
    Permit outbound TCP `1433` to Fabric Data Warehouse endpoints when Lakehouse/Warehouse schema
    inspection or table sampling is required.
-6. Grant the identity only the required Fabric workspace roles and satisfy the Fabric and Power BI
+7. Grant the identity only the required Fabric workspace roles and satisfy the Fabric and Power BI
    tenant settings for service principals and managed identities.
-7. Store `MCP_API_KEY` as a Container Apps secret reference. Prefer an Azure Key Vault reference
-   for production secrets.
 8. Send stdout/stderr to Log Analytics. Alerts may include error codes and request IDs, but must not
    include access tokens, credentials, DAX rows, or full semantic-model definitions.
-9. Deploy with `POWERBI_MCP_READONLY=true`, verify the probes and MCP read workflow, then explicitly
+9. Deploy with `POWERBI_MCP_READONLY=true`, verify probes, OAuth discovery, token rejection, and the
+   MCP read workflow, then explicitly
    approve any transition to write mode.
 
 If managed identity cannot complete a required Fabric operation in the target tenant, keep the
@@ -122,7 +135,10 @@ Microsoft's current Container Apps documentation is authoritative for the Azure 
 For either platform, acceptance requires all of the following:
 
 - `/health` and `/ready` return HTTP 200 without authentication and reveal only status.
-- `/mcp` returns HTTP 401 without the bearer secret and initializes with the correct secret.
+- `/mcp` returns HTTP 401 without a token, advertises the protected-resource metadata URL, and
+  initializes with a valid audience- and scope-bound access token.
+- Both OAuth protected-resource metadata routes return the canonical configured MCP resource URL and
+  authorization-server issuer.
 - The server advertises exactly 25 published tools and two static resources.
 - Workspace discovery returns only workspaces visible to the Entra principal, and Fabric rejects
   requests beyond that principal's roles and item permissions.

@@ -272,6 +272,10 @@ All destructive checks additionally require `FABRIC_TEST_WORKSPACE_ID` and
 `POWERBI_MCP_READONLY=false`. Never point these utilities at a production workspace. Cleanup uses
 strong permanent-delete confirmation and fails the test if the created item cannot be removed.
 
+The live-test utilities load `.env` for variables that are not already defined. Existing process or
+shell environment variables take precedence. Run credential-backed verification from a clean shell,
+or explicitly refresh inherited variables after rotating an Entra client secret.
+
 See `docs/test-evidence.md` for the currently verified release results.
 
 ## Deployment

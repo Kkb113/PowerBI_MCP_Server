@@ -53,20 +53,19 @@ The production `1.0.0` tree passed the following checks on 2026-09-03:
   secrets, SQL text, or row values in the result.
 - `npm run test:live`: the configured service principal discovered three authorized workspaces and
   30 semantic models using enforced read-only mode and aggregate-only output.
+- `npm run test:live:full`: two consecutive disposable semantic-model lifecycles completed through
+  a real MCP HTTP client. Both runs passed create, property update, definition readback, object CRUD,
+  stale-hash rejection, diff and deployment gate, refresh, DAX validation/execution, permanent
+  deletion, and post-delete absence verification.
 
-## Environment-dependent mutation status
+## Live mutation verification result
 
-The guarded `npm run test:live:full` check was attempted twice on 2026-09-03. Fabric rejected the
-initial semantic-model create operation both times with
-`PersonalGateway_ShortMessage_PublishingError` and marked the service response as non-permanent.
-The failure occurred in the Microsoft dataset workload after the local preview and before any model
-ID was returned. Aggregate read-only checks before and after the attempts both reported 30 semantic
-models, confirming that neither attempt left a disposable artifact.
-
-The source, MCP, and production-container end-to-end gates remain successful. A fresh live mutation
-acceptance run is still required after the Fabric tenant/workload publishing condition is resolved;
-do not represent the environment-dependent write gate as passed until that command completes and
-verifies cleanup.
+The guarded `npm run test:live:full` acceptance check passed on 2026-09-03. It executed two complete,
+independent lifecycles against the approved non-production workspace. Both runs returned
+`createVerified`, `propertyUpdateVerified`, `staleHashRejected`, `objectCrudVerified`,
+`definitionReadbackVerified`, `diffAndGateVerified`, `refreshVerified`, `daxVerified`, and
+`permanentDeleteVerified` as true. Both runs returned `activeArtifactLeft` as false, confirming that
+the disposable semantic models were permanently removed.
 
 ## Live mutation verification contract
 

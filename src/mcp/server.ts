@@ -5,7 +5,7 @@ import type { Logger } from "../logging.js";
 import { redactResponse } from "../logging.js";
 import { ModelError } from "../model/errors.js";
 import type { McpToolHandler } from "../services/mcp-workflow-service.js";
-import { REFERENCE_COMMIT, SERVER_NAME, SERVER_VERSION } from "../version.js";
+import { SERVER_NAME, SERVER_VERSION } from "../version.js";
 import { RESOURCE_REGISTRY, SERVER_INSTRUCTIONS, TOOL_REGISTRY, TOOL_NAMES } from "./registry.js";
 import { toolOutputSchema } from "./schemas.js";
 
@@ -17,17 +17,17 @@ export interface FabricMcpServerOptions {
 }
 
 const safetyRules = (readOnly: boolean) => ({
-  scope: "Fabric cloud semantic models only",
+  scope: "Fabric cloud semantic models with read-only Lakehouse and Warehouse inspection",
   canonicalDefinitionFormat: "TMSL",
-  phase: 5,
   fabricMutationEnabled: !readOnly,
   controls: [
     "preview before mutation",
-    "workspace allowlisting",
+    "workspace authorization delegated to Entra and Fabric roles",
     "server-enforced read-only mode",
     "expected definition hash for model changes",
     "repeated ID, exact display-name, and explicit irreversible confirmation before permanent deletion",
     "bounded DAX rows and response bytes",
+    "server-generated read-only SQL for bounded schema inspection and table sampling",
     "secret-free tool arguments, responses, and logs",
   ],
 });
@@ -145,10 +145,9 @@ export function createFabricMcpServer(options: FabricMcpServerOptions): McpServe
         const value =
           resource.name === "semantic-model-capabilities"
             ? {
-                phase: 5,
-                implementationStatus: "mcp_workflows_enabled",
+                implementationStatus: "production",
                 fabricMutationEnabled: !options.readOnly,
-                referenceCommit: REFERENCE_COMMIT,
+                dataInspectionEnabled: true,
                 tools: TOOL_NAMES,
               }
             : safetyRules(options.readOnly);

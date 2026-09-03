@@ -5,7 +5,7 @@
 
 ## Context
 
-The first release must run unchanged on Render and Azure Container Apps, remain stateless across
+The production service must run unchanged on Render and Azure Container Apps, remain stateless across
 restarts, expose platform health probes, and avoid shipping compilers, test tooling, or credentials.
 The server already uses Node.js 24.14.0 and requires no local database or model-definition files.
 

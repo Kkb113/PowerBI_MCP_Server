@@ -34,6 +34,69 @@ export const semanticModelPageSchema = z.object({
   continuationUri: z.url().optional(),
 });
 
+const sqlEndpointPropertiesSchema = z.object({
+  connectionString: z.string().trim().min(1),
+  id: z.string().trim().min(1).max(256),
+  provisioningStatus: z.string().trim().min(1),
+});
+
+export const lakehouseSchema = z.object({
+  id: z.uuid(),
+  displayName: z.string(),
+  description: z.string().optional(),
+  type: z.literal("Lakehouse"),
+  workspaceId: z.uuid(),
+  folderId: z.uuid().optional(),
+  properties: z.object({
+    oneLakeTablesPath: z.url(),
+    oneLakeFilesPath: z.url(),
+    sqlEndpointProperties: sqlEndpointPropertiesSchema,
+    defaultSchema: z.string().trim().min(1).optional(),
+  }),
+  sensitivityLabel: z.object({ id: z.uuid() }).optional(),
+});
+
+export const lakehousePageSchema = z.object({
+  value: z.array(lakehouseSchema),
+  continuationToken: z.string().nullish(),
+  continuationUri: z.url().nullish(),
+});
+
+export const lakehouseTableSchema = z.object({
+  name: z.string().trim().min(1),
+  type: z.string().trim().min(1),
+  format: z.string().trim().min(1),
+  location: z.string().trim().min(1),
+});
+
+export const lakehouseTablePageSchema = z.object({
+  data: z.array(lakehouseTableSchema),
+  continuationToken: z.string().nullish(),
+  continuationUri: z.url().nullish(),
+});
+
+export const warehouseSchema = z.object({
+  id: z.uuid(),
+  displayName: z.string(),
+  description: z.string().optional(),
+  type: z.literal("Warehouse"),
+  workspaceId: z.uuid(),
+  folderId: z.uuid().optional(),
+  properties: z.object({
+    connectionString: z.string().trim().min(1),
+    createdDate: z.string().optional(),
+    lastUpdatedTime: z.string().optional(),
+    collationType: z.string().optional(),
+  }),
+  sensitivityLabel: z.object({ id: z.uuid() }).optional(),
+});
+
+export const warehousePageSchema = z.object({
+  value: z.array(warehouseSchema),
+  continuationToken: z.string().nullish(),
+  continuationUri: z.url().nullish(),
+});
+
 export const definitionPartSchema = z.object({
   path: z.string().min(1),
   payload: z.string(),
@@ -141,6 +204,9 @@ export const refreshExecutionDetailsSchema = refreshSchema.extend({
 
 export type Workspace = z.infer<typeof workspaceSchema>;
 export type SemanticModel = z.infer<typeof semanticModelSchema>;
+export type Lakehouse = z.infer<typeof lakehouseSchema>;
+export type LakehouseTable = z.infer<typeof lakehouseTableSchema>;
+export type Warehouse = z.infer<typeof warehouseSchema>;
 export type SemanticModelDefinition = z.infer<typeof semanticModelDefinitionSchema>;
 export type OperationState = z.infer<typeof operationStateSchema>;
 export type Connection = z.infer<typeof connectionSchema>;

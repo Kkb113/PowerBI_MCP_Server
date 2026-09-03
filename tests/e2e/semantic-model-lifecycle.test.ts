@@ -24,7 +24,7 @@ const readJson = async (request: IncomingMessage): Promise<Record<string, unknow
 const sendJson = (response: ServerResponse, status: number, body?: unknown): void => {
   response.writeHead(status, {
     "content-type": "application/json",
-    "x-ms-request-id": "phase-4-fixture",
+    "x-ms-request-id": "lifecycle-fixture",
   });
   response.end(body === undefined ? undefined : JSON.stringify(body));
 };
@@ -38,17 +38,17 @@ const requiredString = (body: Readonly<Record<string, unknown>>, key: string): s
 const representativeChanges: readonly unknown[] = [
   {
     action: "create",
-    target: { objectType: "table", name: "Phase 4 Fact" },
-    value: { name: "Phase 4 Fact" },
+    target: { objectType: "table", name: "Lifecycle Fact" },
+    value: { name: "Lifecycle Fact" },
   },
   {
     action: "create",
-    target: { objectType: "column", parentName: "Phase 4 Fact", name: "Key" },
+    target: { objectType: "column", parentName: "Lifecycle Fact", name: "Key" },
     value: { kind: "source", name: "Key", sourceColumn: "Key", dataType: "int64", key: true },
   },
   {
     action: "create",
-    target: { objectType: "column", parentName: "Phase 4 Fact", name: "Amount" },
+    target: { objectType: "column", parentName: "Lifecycle Fact", name: "Amount" },
     value: {
       kind: "source",
       name: "Amount",
@@ -59,10 +59,10 @@ const representativeChanges: readonly unknown[] = [
   },
   {
     action: "create",
-    target: { objectType: "partition", parentName: "Phase 4 Fact", name: "Phase 4 Fact" },
+    target: { objectType: "partition", parentName: "Lifecycle Fact", name: "Lifecycle Fact" },
     value: {
       kind: "m",
-      name: "Phase 4 Fact",
+      name: "Lifecycle Fact",
       mode: "import",
       expression:
         "#table(type table [Key = Int64.Type, Amount = Currency.Type], {{1, 100.0}, {2, 200.0}})",
@@ -70,39 +70,39 @@ const representativeChanges: readonly unknown[] = [
   },
   {
     action: "create",
-    target: { objectType: "measure", parentName: "Phase 4 Fact", name: "Phase 4 Total" },
+    target: { objectType: "measure", parentName: "Lifecycle Fact", name: "Lifecycle Total" },
     value: {
-      name: "Phase 4 Total",
-      expression: "SUM('Phase 4 Fact'[Amount])",
-      description: "Representative Phase 4 measure.",
+      name: "Lifecycle Total",
+      expression: "SUM('Lifecycle Fact'[Amount])",
+      description: "Representative Lifecycle measure.",
       formatString: "#,0.00",
     },
   },
   {
     action: "create",
-    target: { objectType: "table", name: "Phase 4 Dimension" },
-    value: { name: "Phase 4 Dimension" },
+    target: { objectType: "table", name: "Lifecycle Dimension" },
+    value: { name: "Lifecycle Dimension" },
   },
   {
     action: "create",
-    target: { objectType: "column", parentName: "Phase 4 Dimension", name: "Key" },
+    target: { objectType: "column", parentName: "Lifecycle Dimension", name: "Key" },
     value: { kind: "source", name: "Key", sourceColumn: "Key", dataType: "int64", key: true },
   },
   {
     action: "create",
-    target: { objectType: "column", parentName: "Phase 4 Dimension", name: "Label" },
+    target: { objectType: "column", parentName: "Lifecycle Dimension", name: "Label" },
     value: { kind: "source", name: "Label", sourceColumn: "Label", dataType: "string" },
   },
   {
     action: "create",
     target: {
       objectType: "partition",
-      parentName: "Phase 4 Dimension",
-      name: "Phase 4 Dimension",
+      parentName: "Lifecycle Dimension",
+      name: "Lifecycle Dimension",
     },
     value: {
       kind: "m",
-      name: "Phase 4 Dimension",
+      name: "Lifecycle Dimension",
       mode: "import",
       expression: '#table(type table [Key = Int64.Type, Label = text], {{1, "One"}, {2, "Two"}})',
     },
@@ -111,11 +111,11 @@ const representativeChanges: readonly unknown[] = [
     action: "create",
     target: {
       objectType: "hierarchy",
-      parentName: "Phase 4 Dimension",
-      name: "Phase 4 Hierarchy",
+      parentName: "Lifecycle Dimension",
+      name: "Lifecycle Hierarchy",
     },
     value: {
-      name: "Phase 4 Hierarchy",
+      name: "Lifecycle Hierarchy",
       levels: [
         { name: "Key", column: "Key" },
         { name: "Label", column: "Label" },
@@ -124,12 +124,12 @@ const representativeChanges: readonly unknown[] = [
   },
   {
     action: "create",
-    target: { objectType: "relationship", name: "Phase 4 Relationship" },
+    target: { objectType: "relationship", name: "Lifecycle Relationship" },
     value: {
-      name: "Phase 4 Relationship",
-      fromTable: "Phase 4 Fact",
+      name: "Lifecycle Relationship",
+      fromTable: "Lifecycle Fact",
       fromColumn: "Key",
-      toTable: "Phase 4 Dimension",
+      toTable: "Lifecycle Dimension",
       toColumn: "Key",
       fromCardinality: "many",
       toCardinality: "one",
@@ -137,19 +137,19 @@ const representativeChanges: readonly unknown[] = [
   },
   {
     action: "create",
-    target: { objectType: "calculation_group", name: "Phase 4 Calculation" },
+    target: { objectType: "calculation_group", name: "Lifecycle Calculation" },
     value: {
-      tableName: "Phase 4 Calculation",
+      tableName: "Lifecycle Calculation",
       items: [{ name: "Current", expression: "SELECTEDMEASURE()" }],
     },
   },
   {
     action: "create",
-    target: { objectType: "role", name: "Phase 4 Reader" },
+    target: { objectType: "role", name: "Lifecycle Reader" },
     value: {
-      name: "Phase 4 Reader",
+      name: "Lifecycle Reader",
       tablePermissions: [
-        { table: "Phase 4 Dimension", filterExpression: "'Phase 4 Dimension'[Key] > 0" },
+        { table: "Lifecycle Dimension", filterExpression: "'Lifecycle Dimension'[Key] > 0" },
       ],
     },
   },
@@ -303,14 +303,14 @@ describe("semantic model lifecycle end to end", () => {
         maxResponseBytes: 1_000_000,
         logger,
       }),
-      { allowedWorkspaceIds: [WORKSPACE_ID], readOnly: false, maxPages: 10 },
+      { readOnly: false, maxPages: 10 },
     );
     const service = new SemanticModelService(fabric, { lroPollBudgetMs: 1_000 });
     const initial = loadModelFixture();
 
     const preview = await service.createSemanticModel({
       workspaceId: WORKSPACE_ID,
-      displayName: "Phase 4 E2E",
+      displayName: "Lifecycle E2E",
       model: initial,
     });
     expect(preview.status).toBe("preview");
@@ -318,7 +318,7 @@ describe("semantic model lifecycle end to end", () => {
 
     const created = await service.createSemanticModel({
       workspaceId: WORKSPACE_ID,
-      displayName: "Phase 4 E2E",
+      displayName: "Lifecycle E2E",
       description: "Disposable local fixture",
       model: initial,
       apply: true,
@@ -330,13 +330,13 @@ describe("semantic model lifecycle end to end", () => {
     const renamed = await service.updateSemanticModelProperties({
       workspaceId: WORKSPACE_ID,
       semanticModelId: MODEL_ID,
-      displayName: "Phase 4 E2E Updated",
+      displayName: "Lifecycle E2E Updated",
       description: "Updated metadata",
       apply: true,
     });
     expect(renamed).toMatchObject({
       status: "completed",
-      item: { displayName: "Phase 4 E2E Updated" },
+      item: { displayName: "Lifecycle E2E Updated" },
     });
 
     const mutation = await service.applyModelChanges({
@@ -393,7 +393,7 @@ describe("semantic model lifecycle end to end", () => {
         workspaceId: WORKSPACE_ID,
         semanticModelId: MODEL_ID,
         confirmSemanticModelId: MODEL_ID,
-        confirmDisplayName: "Phase 4 E2E Updated",
+        confirmDisplayName: "Lifecycle E2E Updated",
         confirmPermanentDelete: true,
         apply: true,
       }),

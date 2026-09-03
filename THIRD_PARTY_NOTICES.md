@@ -1,11 +1,13 @@
 # Third-party notices
 
-## Power BI MCP behavioral reference
+## Tedious
 
-This project was designed with reference to `sulaiman013/powerbi-mcp` at commit
-`977b4d126fed9dee7b8d6dade6d45dc5ac7064fb`.
+The production server uses `tedious` 20.0.0 for read-only TDS connections to Fabric SQL
+endpoints.
 
-Copyright (c) 2025 Sulaiman Ahmed
+The MIT License
+
+Copyright (c) 2010-2018 Mike D Pilsbury
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,

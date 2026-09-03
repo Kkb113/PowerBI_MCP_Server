@@ -15,6 +15,5 @@ tests
 .DS_Store
 .idea
 .vscode
-implementation.md
 README.md
 render.yaml

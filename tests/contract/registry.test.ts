@@ -9,6 +9,13 @@ import {
 const expectedTools = [
   "list_workspaces",
   "list_semantic_models",
+  "list_lakehouses",
+  "get_lakehouse",
+  "list_lakehouse_tables",
+  "list_warehouses",
+  "get_warehouse",
+  "inspect_data_source_schema",
+  "sample_data_source_table",
   "get_semantic_model",
   "get_semantic_model_definition",
   "get_model_info",
@@ -63,7 +70,7 @@ describe("MCP registry parity", () => {
     expect(uris).toEqual(["fabric://reference/capabilities", "fabric://reference/safety"]);
   });
 
-  it("enforces cross-field requirements in the frozen schemas", () => {
+  it("enforces cross-field requirements in the published schemas", () => {
     const updateProperties = TOOL_REGISTRY.find(
       (tool) => tool.name === "update_semantic_model_properties",
     );

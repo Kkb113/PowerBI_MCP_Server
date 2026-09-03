@@ -3,7 +3,7 @@
   "model": {
     "culture": "en-US",
     "sourceQueryCulture": "en-US",
-    "description": "Phase 3 semantic-model fixture",
+    "description": "Golden semantic-model fixture",
     "defaultPowerBIDataSourceVersion": "powerBI_V3",
     "discourageImplicitMeasures": true,
     "dataAccessOptions": {
@@ -31,7 +31,7 @@
         "annotations": [
           {
             "name": "FixtureSource",
-            "value": "Phase3"
+            "value": "GoldenFixture"
           }
         ]
       }
@@ -420,7 +420,7 @@
     "annotations": [
       {
         "name": "FixtureModel",
-        "value": "Phase3"
+        "value": "GoldenFixture"
       }
     ]
   }

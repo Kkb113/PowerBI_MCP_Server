@@ -6,6 +6,7 @@ import {
   CachedAccessTokenProvider,
   createAzureCredential,
   FABRIC_SCOPE,
+  FABRIC_SQL_SCOPE,
   POWERBI_SCOPE,
 } from "../../src/identity.js";
 
@@ -61,10 +62,12 @@ describe("CachedAccessTokenProvider", () => {
 
     await expect(provider.getAccessToken("fabric")).resolves.toBe(FABRIC_SCOPE);
     await expect(provider.getAccessToken("fabric")).resolves.toBe(FABRIC_SCOPE);
+    await expect(provider.getAccessToken("fabric-sql")).resolves.toBe(FABRIC_SQL_SCOPE);
     await expect(provider.getAccessToken("powerbi")).resolves.toBe(POWERBI_SCOPE);
-    expect(credential.getToken).toHaveBeenCalledTimes(2);
+    expect(credential.getToken).toHaveBeenCalledTimes(3);
     expect(credential.getToken).toHaveBeenNthCalledWith(1, FABRIC_SCOPE);
-    expect(credential.getToken).toHaveBeenNthCalledWith(2, POWERBI_SCOPE);
+    expect(credential.getToken).toHaveBeenNthCalledWith(2, FABRIC_SQL_SCOPE);
+    expect(credential.getToken).toHaveBeenNthCalledWith(3, POWERBI_SCOPE);
   });
 
   it("deduplicates concurrent acquisition and supports targeted and full cache clearing", async () => {

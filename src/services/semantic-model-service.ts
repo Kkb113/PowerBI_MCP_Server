@@ -24,9 +24,8 @@ import {
   type ModelSpec,
   type ModelTransactionResult,
 } from "../model/index.js";
+import { paginateValues, type Page } from "./pagination.js";
 
-const DEFAULT_PAGE_SIZE = 100;
-const MAX_PAGE_SIZE = 500;
 const DEFAULT_SUMMARY_LIMIT = 200;
 const MAX_SUMMARY_LIMIT = 1_000;
 const DEFAULT_POLL_INTERVAL_MS = 1_000;
@@ -35,10 +34,6 @@ const uuidSchema = z.uuid();
 const itemNameSchema = z.string().trim().min(1).max(256);
 const itemDescriptionSchema = z.string().max(256);
 const hashSchema = z.string().regex(/^[a-f0-9]{64}$/u, "must be a lowercase SHA-256 hash");
-const paginationSchema = z.strictObject({
-  continuationToken: z.string().min(1).max(8_192).optional(),
-  limit: z.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
-});
 const summarySectionSchema = z.enum([
   "tables",
   "columns",
@@ -51,11 +46,6 @@ const summarySectionSchema = z.enum([
   "dataSources",
   "expressions",
 ]);
-const continuationPayloadSchema = z.strictObject({
-  version: z.literal(1),
-  scope: z.string().min(1),
-  offset: z.number().int().min(1),
-});
 
 export type ModelInfoSection = z.infer<typeof summarySectionSchema>;
 
@@ -80,11 +70,6 @@ export interface SemanticModelServiceOptions {
   readonly pollIntervalMs?: number;
   readonly now?: () => number;
   readonly sleep?: (milliseconds: number) => Promise<void>;
-}
-
-export interface Page<T> {
-  readonly value: readonly T[];
-  readonly continuationToken?: string;
 }
 
 export interface PendingOperation {
@@ -439,46 +424,6 @@ const sameConnectionDetails = (
   return expected.path === actual.path;
 };
 
-const encodeContinuation = (scope: string, offset: number): string =>
-  Buffer.from(JSON.stringify({ version: 1, scope, offset }), "utf8").toString("base64url");
-
-const decodeContinuation = (token: string | undefined, scope: string): number => {
-  if (!token) return 0;
-  try {
-    const payload = continuationPayloadSchema.parse(
-      JSON.parse(Buffer.from(token, "base64url").toString("utf8")) as unknown,
-    );
-    if (payload.scope !== scope) {
-      throw new Error("scope mismatch");
-    }
-    return payload.offset;
-  } catch {
-    throw new DomainError(
-      "INVALID_CONTINUATION_TOKEN",
-      "The continuation token is invalid for this collection.",
-    );
-  }
-};
-
-const pageValues = <T>(values: readonly T[], scope: string, input: unknown): Page<T> => {
-  const pagination = parseInput(paginationSchema, input, "pagination");
-  const offset = decodeContinuation(pagination.continuationToken, scope);
-  if (offset > values.length) {
-    throw new DomainError(
-      "INVALID_CONTINUATION_TOKEN",
-      "The continuation token points beyond the current collection.",
-    );
-  }
-  const value = values.slice(offset, offset + pagination.limit);
-  const nextOffset = offset + value.length;
-  return {
-    value,
-    ...(nextOffset < values.length
-      ? { continuationToken: encodeContinuation(scope, nextOffset) }
-      : {}),
-  };
-};
-
 const completedSnapshot = (
   item: SemanticModel,
   definition: SemanticModelDefinition,
@@ -526,7 +471,7 @@ export class SemanticModelService {
 
   public async listWorkspaces(input: unknown = {}): Promise<Page<Workspace>> {
     const workspaces = await this.fabric.listWorkspaces();
-    return pageValues(workspaces, "workspaces", input);
+    return paginateValues(workspaces, "workspaces", input);
   }
 
   public async listSemanticModels(
@@ -535,7 +480,7 @@ export class SemanticModelService {
   ): Promise<Page<SemanticModel>> {
     const validWorkspaceId = parseInput(uuidSchema, workspaceId, "list_semantic_models");
     const semanticModels = await this.fabric.listSemanticModels(validWorkspaceId);
-    return pageValues(semanticModels, `semanticModels:${validWorkspaceId}`, input);
+    return paginateValues(semanticModels, `semanticModels:${validWorkspaceId}`, input);
   }
 
   public async getSemanticModel(

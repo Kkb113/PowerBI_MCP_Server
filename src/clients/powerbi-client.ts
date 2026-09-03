@@ -2,7 +2,7 @@ import { z } from "zod";
 import { assertWritable, ApiError } from "./errors.js";
 import type { ApiResponse } from "./http-client.js";
 import type { ResilientHttpClient } from "./http-client.js";
-import { validateUuid, WorkspacePolicy } from "./policy.js";
+import { validateUuid } from "./policy.js";
 import {
   executeQueriesResponseSchema,
   refreshExecutionDetailsSchema,
@@ -40,7 +40,6 @@ export type ExecuteDaxRequest = z.input<typeof executeDaxRequestSchema>;
 export type StartRefreshRequest = z.input<typeof startRefreshRequestSchema>;
 
 export interface PowerBiClientOptions {
-  readonly allowedWorkspaceIds: readonly string[];
   readonly readOnly: boolean;
 }
 
@@ -58,14 +57,10 @@ const invalidInput = (operation: string, error: z.ZodError): ApiError =>
   });
 
 export class PowerBiClient {
-  private readonly workspacePolicy: WorkspacePolicy;
-
   public constructor(
     private readonly http: ResilientHttpClient,
     private readonly options: PowerBiClientOptions,
-  ) {
-    this.workspacePolicy = new WorkspacePolicy(options.allowedWorkspaceIds);
-  }
+  ) {}
 
   public async executeDax(
     workspaceId: string,
@@ -179,18 +174,14 @@ export class PowerBiClient {
     semanticModelId: string,
     operation: string,
   ): { readonly workspaceId: string; readonly semanticModelId: string } {
-    const allowedWorkspaceId = this.workspacePolicy.assertAllowed(
-      workspaceId,
-      operation,
-      "powerbi",
-    );
+    const validWorkspaceId = validateUuid(workspaceId, "workspaceId", operation, "powerbi");
     const validSemanticModelId = validateUuid(
       semanticModelId,
       "semanticModelId",
       operation,
       "powerbi",
     );
-    return { workspaceId: allowedWorkspaceId, semanticModelId: validSemanticModelId };
+    return { workspaceId: validWorkspaceId, semanticModelId: validSemanticModelId };
   }
 
   private parseInput<T>(schema: z.ZodType<T>, input: unknown, operation: string): T {

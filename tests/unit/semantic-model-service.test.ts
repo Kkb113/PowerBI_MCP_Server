@@ -203,11 +203,11 @@ const accepted = <T>(): FabricOperation<T> => ({
 
 const addMeasure = {
   action: "create",
-  target: { objectType: "measure", parentName: "Sales Data", name: "Phase 4 Orders" },
+  target: { objectType: "measure", parentName: "Sales Data", name: "Lifecycle Orders" },
   value: {
-    name: "Phase 4 Orders",
+    name: "Lifecycle Orders",
     expression: "DISTINCTCOUNT('Sales Data'[Order ID])",
-    description: "Phase 4 test measure.",
+    description: "Lifecycle test measure.",
     formatString: "#,0",
   },
 };
@@ -265,7 +265,7 @@ describe("SemanticModelService safe mutations", () => {
 
     const preview = await service.createSemanticModel({
       workspaceId: WORKSPACE_ID,
-      displayName: "Phase 4 model",
+      displayName: "Lifecycle model",
       model,
     });
     expect(preview).toMatchObject({ status: "preview", applied: false });
@@ -273,7 +273,7 @@ describe("SemanticModelService safe mutations", () => {
 
     const applied = await service.createSemanticModel({
       workspaceId: WORKSPACE_ID,
-      displayName: "Phase 4 model",
+      displayName: "Lifecycle model",
       description: "Disposable",
       model,
       apply: true,
@@ -548,7 +548,7 @@ describe("SemanticModelService long-running operations", () => {
     fabric.operationStates = [
       {
         status: "Failed",
-        error: { errorCode: "CorruptedPayload", message: "Definition was rejected." },
+        error: { errorCode: "Corruptedhayload", message: "Definition was rejected." },
       },
     ];
     await expect(

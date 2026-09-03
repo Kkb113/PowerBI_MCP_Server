@@ -4,6 +4,7 @@ import { ConfigurationError, loadConfig } from "../src/config.js";
 import { createLogger } from "../src/logging.js";
 import { ModelError, type ModelSpec } from "../src/model/index.js";
 import { SemanticModelService } from "../src/services/index.js";
+import { requireLiveTestWorkspaceId } from "./live-workspace.js";
 
 try {
   process.loadEnvFile();
@@ -25,7 +26,7 @@ const baseModel: ModelSpec = {
   annotations: [],
   tables: [
     {
-      name: "Phase 4 Base",
+      name: "Lifecycle Base",
       hidden: false,
       columns: [
         {
@@ -42,7 +43,7 @@ const baseModel: ModelSpec = {
       partitions: [
         {
           kind: "m",
-          name: "Phase 4 Base",
+          name: "Lifecycle Base",
           mode: "import",
           expression: "#table(type table [Key = Int64.Type], {{1}})",
           annotations: [],
@@ -58,17 +59,17 @@ const baseModel: ModelSpec = {
 const createChanges: readonly unknown[] = [
   {
     action: "create",
-    target: { objectType: "table", name: "Phase 4 Fact" },
-    value: { name: "Phase 4 Fact" },
+    target: { objectType: "table", name: "Lifecycle Fact" },
+    value: { name: "Lifecycle Fact" },
   },
   {
     action: "create",
-    target: { objectType: "column", parentName: "Phase 4 Fact", name: "Key" },
+    target: { objectType: "column", parentName: "Lifecycle Fact", name: "Key" },
     value: { kind: "source", name: "Key", sourceColumn: "Key", dataType: "int64", key: true },
   },
   {
     action: "create",
-    target: { objectType: "column", parentName: "Phase 4 Fact", name: "Amount" },
+    target: { objectType: "column", parentName: "Lifecycle Fact", name: "Amount" },
     value: {
       kind: "source",
       name: "Amount",
@@ -79,10 +80,10 @@ const createChanges: readonly unknown[] = [
   },
   {
     action: "create",
-    target: { objectType: "partition", parentName: "Phase 4 Fact", name: "Phase 4 Fact" },
+    target: { objectType: "partition", parentName: "Lifecycle Fact", name: "Lifecycle Fact" },
     value: {
       kind: "m",
-      name: "Phase 4 Fact",
+      name: "Lifecycle Fact",
       mode: "import",
       expression:
         "#table(type table [Key = Int64.Type, Amount = Currency.Type], {{1, 100.0}, {2, 200.0}})",
@@ -90,39 +91,39 @@ const createChanges: readonly unknown[] = [
   },
   {
     action: "create",
-    target: { objectType: "measure", parentName: "Phase 4 Fact", name: "Phase 4 Total" },
+    target: { objectType: "measure", parentName: "Lifecycle Fact", name: "Lifecycle Total" },
     value: {
-      name: "Phase 4 Total",
-      expression: "SUM('Phase 4 Fact'[Amount])",
-      description: "Live Phase 4 measure.",
+      name: "Lifecycle Total",
+      expression: "SUM('Lifecycle Fact'[Amount])",
+      description: "Live lifecycle verification measure.",
       formatString: "#,0.00",
     },
   },
   {
     action: "create",
-    target: { objectType: "table", name: "Phase 4 Dimension" },
-    value: { name: "Phase 4 Dimension" },
+    target: { objectType: "table", name: "Lifecycle Dimension" },
+    value: { name: "Lifecycle Dimension" },
   },
   {
     action: "create",
-    target: { objectType: "column", parentName: "Phase 4 Dimension", name: "Key" },
+    target: { objectType: "column", parentName: "Lifecycle Dimension", name: "Key" },
     value: { kind: "source", name: "Key", sourceColumn: "Key", dataType: "int64", key: true },
   },
   {
     action: "create",
-    target: { objectType: "column", parentName: "Phase 4 Dimension", name: "Label" },
+    target: { objectType: "column", parentName: "Lifecycle Dimension", name: "Label" },
     value: { kind: "source", name: "Label", sourceColumn: "Label", dataType: "string" },
   },
   {
     action: "create",
     target: {
       objectType: "partition",
-      parentName: "Phase 4 Dimension",
-      name: "Phase 4 Dimension",
+      parentName: "Lifecycle Dimension",
+      name: "Lifecycle Dimension",
     },
     value: {
       kind: "m",
-      name: "Phase 4 Dimension",
+      name: "Lifecycle Dimension",
       mode: "import",
       expression: '#table(type table [Key = Int64.Type, Label = text], {{1, "One"}, {2, "Two"}})',
     },
@@ -131,11 +132,11 @@ const createChanges: readonly unknown[] = [
     action: "create",
     target: {
       objectType: "hierarchy",
-      parentName: "Phase 4 Dimension",
-      name: "Phase 4 Hierarchy",
+      parentName: "Lifecycle Dimension",
+      name: "Lifecycle Hierarchy",
     },
     value: {
-      name: "Phase 4 Hierarchy",
+      name: "Lifecycle Hierarchy",
       levels: [
         { name: "Key", column: "Key" },
         { name: "Label", column: "Label" },
@@ -144,12 +145,12 @@ const createChanges: readonly unknown[] = [
   },
   {
     action: "create",
-    target: { objectType: "relationship", name: "Phase 4 Relationship" },
+    target: { objectType: "relationship", name: "Lifecycle Relationship" },
     value: {
-      name: "Phase 4 Relationship",
-      fromTable: "Phase 4 Fact",
+      name: "Lifecycle Relationship",
+      fromTable: "Lifecycle Fact",
       fromColumn: "Key",
-      toTable: "Phase 4 Dimension",
+      toTable: "Lifecycle Dimension",
       toColumn: "Key",
       fromCardinality: "many",
       toCardinality: "one",
@@ -157,19 +158,19 @@ const createChanges: readonly unknown[] = [
   },
   {
     action: "create",
-    target: { objectType: "calculation_group", name: "Phase 4 Calculation" },
+    target: { objectType: "calculation_group", name: "Lifecycle Calculation" },
     value: {
-      tableName: "Phase 4 Calculation",
+      tableName: "Lifecycle Calculation",
       items: [{ name: "Current", expression: "SELECTEDMEASURE()" }],
     },
   },
   {
     action: "create",
-    target: { objectType: "role", name: "Phase 4 Reader" },
+    target: { objectType: "role", name: "Lifecycle Reader" },
     value: {
-      name: "Phase 4 Reader",
+      name: "Lifecycle Reader",
       tablePermissions: [
-        { table: "Phase 4 Dimension", filterExpression: "'Phase 4 Dimension'[Key] > 0" },
+        { table: "Lifecycle Dimension", filterExpression: "'Lifecycle Dimension'[Key] > 0" },
       ],
     },
   },
@@ -178,7 +179,7 @@ const createChanges: readonly unknown[] = [
 const updateChanges: readonly unknown[] = [
   {
     action: "update",
-    target: { objectType: "column", parentName: "Phase 4 Fact", name: "Amount" },
+    target: { objectType: "column", parentName: "Lifecycle Fact", name: "Amount" },
     value: {
       kind: "source",
       name: "Amount",
@@ -191,10 +192,10 @@ const updateChanges: readonly unknown[] = [
   },
   {
     action: "update",
-    target: { objectType: "partition", parentName: "Phase 4 Fact", name: "Phase 4 Fact" },
+    target: { objectType: "partition", parentName: "Lifecycle Fact", name: "Lifecycle Fact" },
     value: {
       kind: "m",
-      name: "Phase 4 Fact",
+      name: "Lifecycle Fact",
       mode: "import",
       expression:
         "#table(type table [Key = Int64.Type, Amount = Currency.Type], {{1, 125.0}, {2, 250.0}})",
@@ -202,11 +203,11 @@ const updateChanges: readonly unknown[] = [
   },
   {
     action: "update",
-    target: { objectType: "measure", parentName: "Phase 4 Fact", name: "Phase 4 Total" },
+    target: { objectType: "measure", parentName: "Lifecycle Fact", name: "Lifecycle Total" },
     value: {
-      name: "Phase 4 Total",
-      expression: "COALESCE(SUM('Phase 4 Fact'[Amount]), 0)",
-      description: "Updated live Phase 4 measure.",
+      name: "Lifecycle Total",
+      expression: "COALESCE(SUM('Lifecycle Fact'[Amount]), 0)",
+      description: "Updated live lifecycle verification measure.",
       formatString: "$#,0.00",
     },
   },
@@ -214,11 +215,11 @@ const updateChanges: readonly unknown[] = [
     action: "update",
     target: {
       objectType: "hierarchy",
-      parentName: "Phase 4 Dimension",
-      name: "Phase 4 Hierarchy",
+      parentName: "Lifecycle Dimension",
+      name: "Lifecycle Hierarchy",
     },
     value: {
-      name: "Phase 4 Hierarchy",
+      name: "Lifecycle Hierarchy",
       description: "Updated live hierarchy.",
       levels: [
         { name: "Key", column: "Key" },
@@ -228,12 +229,12 @@ const updateChanges: readonly unknown[] = [
   },
   {
     action: "update",
-    target: { objectType: "relationship", name: "Phase 4 Relationship" },
+    target: { objectType: "relationship", name: "Lifecycle Relationship" },
     value: {
-      name: "Phase 4 Relationship",
-      fromTable: "Phase 4 Fact",
+      name: "Lifecycle Relationship",
+      fromTable: "Lifecycle Fact",
       fromColumn: "Key",
-      toTable: "Phase 4 Dimension",
+      toTable: "Lifecycle Dimension",
       toColumn: "Key",
       fromCardinality: "many",
       toCardinality: "one",
@@ -242,9 +243,9 @@ const updateChanges: readonly unknown[] = [
   },
   {
     action: "update",
-    target: { objectType: "calculation_group", name: "Phase 4 Calculation" },
+    target: { objectType: "calculation_group", name: "Lifecycle Calculation" },
     value: {
-      tableName: "Phase 4 Calculation",
+      tableName: "Lifecycle Calculation",
       description: "Updated live calculation group.",
       precedence: 10,
       items: [{ name: "Current", expression: "SELECTEDMEASURE()", ordinal: 0 }],
@@ -252,65 +253,65 @@ const updateChanges: readonly unknown[] = [
   },
   {
     action: "update",
-    target: { objectType: "role", name: "Phase 4 Reader" },
+    target: { objectType: "role", name: "Lifecycle Reader" },
     value: {
-      name: "Phase 4 Reader",
+      name: "Lifecycle Reader",
       description: "Updated live role.",
       tablePermissions: [
-        { table: "Phase 4 Dimension", filterExpression: "'Phase 4 Dimension'[Key] >= 1" },
+        { table: "Lifecycle Dimension", filterExpression: "'Lifecycle Dimension'[Key] >= 1" },
       ],
     },
   },
 ];
 
 const deleteChanges: readonly unknown[] = [
-  { action: "delete", target: { objectType: "role", name: "Phase 4 Reader" } },
-  { action: "delete", target: { objectType: "relationship", name: "Phase 4 Relationship" } },
+  { action: "delete", target: { objectType: "role", name: "Lifecycle Reader" } },
+  { action: "delete", target: { objectType: "relationship", name: "Lifecycle Relationship" } },
   {
     action: "delete",
     target: {
       objectType: "hierarchy",
-      parentName: "Phase 4 Dimension",
-      name: "Phase 4 Hierarchy",
+      parentName: "Lifecycle Dimension",
+      name: "Lifecycle Hierarchy",
     },
   },
   {
     action: "delete",
-    target: { objectType: "measure", parentName: "Phase 4 Fact", name: "Phase 4 Total" },
+    target: { objectType: "measure", parentName: "Lifecycle Fact", name: "Lifecycle Total" },
   },
   {
     action: "delete",
-    target: { objectType: "partition", parentName: "Phase 4 Fact", name: "Phase 4 Fact" },
+    target: { objectType: "partition", parentName: "Lifecycle Fact", name: "Lifecycle Fact" },
   },
   {
     action: "delete",
     target: {
       objectType: "partition",
-      parentName: "Phase 4 Dimension",
-      name: "Phase 4 Dimension",
+      parentName: "Lifecycle Dimension",
+      name: "Lifecycle Dimension",
     },
   },
   {
     action: "delete",
-    target: { objectType: "column", parentName: "Phase 4 Fact", name: "Amount" },
+    target: { objectType: "column", parentName: "Lifecycle Fact", name: "Amount" },
   },
   {
     action: "delete",
-    target: { objectType: "column", parentName: "Phase 4 Fact", name: "Key" },
+    target: { objectType: "column", parentName: "Lifecycle Fact", name: "Key" },
   },
   {
     action: "delete",
-    target: { objectType: "column", parentName: "Phase 4 Dimension", name: "Label" },
+    target: { objectType: "column", parentName: "Lifecycle Dimension", name: "Label" },
   },
   {
     action: "delete",
-    target: { objectType: "column", parentName: "Phase 4 Dimension", name: "Key" },
+    target: { objectType: "column", parentName: "Lifecycle Dimension", name: "Key" },
   },
-  { action: "delete", target: { objectType: "table", name: "Phase 4 Fact" } },
-  { action: "delete", target: { objectType: "table", name: "Phase 4 Dimension" } },
+  { action: "delete", target: { objectType: "table", name: "Lifecycle Fact" } },
+  { action: "delete", target: { objectType: "table", name: "Lifecycle Dimension" } },
   {
     action: "delete",
-    target: { objectType: "calculation_group", name: "Phase 4 Calculation" },
+    target: { objectType: "calculation_group", name: "Lifecycle Calculation" },
   },
 ];
 
@@ -325,27 +326,23 @@ const requireCompleted = <T extends { readonly status: string }>(
 };
 
 async function main(): Promise<void> {
-  if (process.env["PHASE4_LIVE_MUTATION"] !== "true") {
+  if (process.env["LIVE_LIFECYCLE_MUTATION"] !== "true") {
     throw new ConfigurationError([
-      "PHASE4_LIVE_MUTATION must be true for the disposable Phase 4 live mutation check.",
+      "LIVE_LIFECYCLE_MUTATION must be true for the disposable lifecycle mutation check.",
     ]);
   }
-  if (process.env["PHASE4_LIVE_PERMANENT_DELETE"] !== "true") {
+  if (process.env["LIVE_LIFECYCLE_PERMANENT_DELETE"] !== "true") {
     throw new ConfigurationError([
-      "PHASE4_LIVE_PERMANENT_DELETE must be true because semantic models do not support recoverable deletion.",
+      "LIVE_LIFECYCLE_PERMANENT_DELETE must be true because semantic models do not support recoverable deletion.",
     ]);
   }
   const config = loadConfig();
   if (config.readOnly) {
     throw new ConfigurationError([
-      "POWERBI_MCP_READONLY must be false for the disposable Phase 4 live mutation check.",
+      "POWERBI_MCP_READONLY must be false for the disposable lifecycle mutation check.",
     ]);
   }
-  if (config.allowedWorkspaceIds.length !== 1) {
-    throw new ConfigurationError([
-      "FABRIC_ALLOWED_WORKSPACE_IDS must contain exactly one development workspace for the Phase 4 live mutation check.",
-    ]);
-  }
+  const workspaceId = requireLiveTestWorkspaceId();
 
   const logger = createLogger({
     level: config.logLevel,
@@ -358,9 +355,8 @@ async function main(): Promise<void> {
   const service = new SemanticModelService(clients.fabric, {
     lroPollBudgetMs: config.lroPollBudgetMs,
   });
-  const workspaceId = config.allowedWorkspaceIds[0]!;
   const suffix = `${new Date().toISOString().replaceAll(/[-:.TZ]/gu, "")}-${randomUUID().slice(0, 8)}`;
-  const originalName = `MCP Phase 4 ${suffix}`;
+  const originalName = `MCP Lifecycle Verification ${suffix}`;
   const updatedName = `${originalName} Updated`;
   let semanticModelId: string | undefined;
   let currentName = originalName;
@@ -376,13 +372,13 @@ async function main(): Promise<void> {
     const workspaces = await clients.fabric.listWorkspaces();
     if (!workspaces.some((workspace) => workspace.id.toLowerCase() === workspaceId)) {
       throw new Error(
-        "The configured development workspace is not visible to the service principal.",
+        "The configured non-production workspace is not visible to the service principal.",
       );
     }
     const preview = await service.createSemanticModel({
       workspaceId,
       displayName: originalName,
-      description: "Disposable Phase 4 lifecycle validation model.",
+      description: "Disposable semantic-model lifecycle validation model.",
       model: baseModel,
     });
     if (preview.status !== "preview")
@@ -392,7 +388,7 @@ async function main(): Promise<void> {
       await service.createSemanticModel({
         workspaceId,
         displayName: originalName,
-        description: "Disposable Phase 4 lifecycle validation model.",
+        description: "Disposable semantic-model lifecycle validation model.",
         model: baseModel,
         apply: true,
       }),
@@ -413,7 +409,7 @@ async function main(): Promise<void> {
       workspaceId,
       semanticModelId,
       displayName: updatedName,
-      description: "Updated disposable Phase 4 lifecycle validation model.",
+      description: "Updated disposable semantic-model lifecycle validation model.",
       apply: true,
     });
     currentName = updatedName;
@@ -522,7 +518,7 @@ async function main(): Promise<void> {
   evidence["activeArtifactLeft"] = semanticModelId !== undefined && !deleted;
   if (primaryError instanceof Error) throw primaryError;
   if (primaryError !== undefined) {
-    throw new Error("The Phase 4 live lifecycle check failed.", { cause: primaryError });
+    throw new Error("The live semantic-model lifecycle check failed.", { cause: primaryError });
   }
   process.stdout.write(`${JSON.stringify({ ok: true, ...evidence })}\n`);
 }
@@ -534,7 +530,7 @@ try {
     level: "error",
     knownSecrets: [process.env["MCP_API_KEY"] ?? "", process.env["AZURE_CLIENT_SECRET"] ?? ""],
   });
-  logger.error("Phase 4 live lifecycle check failed", {
+  logger.error("Live semantic-model lifecycle check failed", {
     error: error instanceof ModelError ? error.toJSON() : error,
   });
   process.exitCode = 1;

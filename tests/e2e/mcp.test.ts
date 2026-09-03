@@ -2,6 +2,7 @@ import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/cli
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FabricClient } from "../../src/clients/fabric-client.js";
 import type { PowerBiClient } from "../../src/clients/powerbi-client.js";
+import type { FabricDataService } from "../../src/services/fabric-data-service.js";
 import { DomainError } from "../../src/errors.js";
 import { hashModelSpec } from "../../src/model/index.js";
 import { RESOURCE_REGISTRY, TOOL_NAMES } from "../../src/mcp/registry.js";
@@ -29,12 +30,12 @@ describe("remote MCP end to end", () => {
     testServer = undefined;
   });
 
-  it("initializes, discovers the frozen contract, reads resources, and invokes a real handler", async () => {
+  it("initializes, discovers the published contract, reads resources, and invokes a real handler", async () => {
     testServer = await startTestHttpServer();
     const transport = new StreamableHTTPClientTransport(new URL(`${testServer.baseUrl}/mcp`), {
       authProvider: { token: () => Promise.resolve(TEST_API_KEY) },
     });
-    client = new Client({ name: "phase-one-e2e", version: "1.0.0" });
+    client = new Client({ name: "protocol-e2e", version: "1.0.0" });
 
     await client.connect(transport);
 
@@ -54,9 +55,9 @@ describe("remote MCP end to end", () => {
     });
     const content = resource.contents[0];
     expect(content && "text" in content ? JSON.parse(content.text) : undefined).toMatchObject({
-      phase: 5,
-      implementationStatus: "mcp_workflows_enabled",
+      implementationStatus: "production",
       fabricMutationEnabled: false,
+      dataInspectionEnabled: true,
     });
 
     const result = await client.callTool({ name: "list_workspaces", arguments: {} });
@@ -69,11 +70,11 @@ describe("remote MCP end to end", () => {
     });
   });
 
-  it("executes every frozen tool through the MCP transport and Phase 5 workflow router", async () => {
+  it("executes every published tool through the MCP transport and workflow router", async () => {
     const model = loadModelFixture();
     const item = {
       id: MODEL_ID,
-      displayName: "Phase 5 E2E",
+      displayName: "Workflow E2E",
       type: "SemanticModel" as const,
       workspaceId: WORKSPACE_ID,
     };
@@ -138,13 +139,23 @@ describe("remote MCP end to end", () => {
       PowerBiClient,
       "executeDax" | "startRefresh" | "getRefreshExecutionDetails"
     >;
-    const workflow = new McpWorkflowService(semanticModels, fabric, powerBi, {
+    const fabricData = {
+      listLakehouses: vi.fn().mockResolvedValue({ value: [] }),
+      getLakehouse: vi.fn().mockResolvedValue({}),
+      listLakehouseTables: vi.fn().mockResolvedValue({ value: [] }),
+      listWarehouses: vi.fn().mockResolvedValue({ value: [] }),
+      getWarehouse: vi.fn().mockResolvedValue({}),
+      inspectSchema: vi.fn().mockResolvedValue({ columns: [], truncated: false }),
+      sampleTable: vi.fn().mockResolvedValue({ rows: [], returnedRows: 0, truncated: false }),
+    } as unknown as FabricDataService;
+    const workflow = new McpWorkflowService(semanticModels, fabric, powerBi, fabricData, {
       maxDaxRows: 100,
       maxResponseBytes: 65_536,
+      maxDataResponseBytes: 65_536,
       readOnly: false,
     });
     testServer = await startTestHttpServer(workflow);
-    client = new Client({ name: "phase-five-e2e", version: "1.0.0" });
+    client = new Client({ name: "workflow-e2e", version: "1.0.0" });
     await client.connect(
       new StreamableHTTPClientTransport(new URL(`${testServer.baseUrl}/mcp`), {
         authProvider: { token: () => Promise.resolve(TEST_API_KEY) },
@@ -158,6 +169,38 @@ describe("remote MCP end to end", () => {
     }> = [
       { name: "list_workspaces", arguments: {} },
       { name: "list_semantic_models", arguments: { workspaceId: WORKSPACE_ID } },
+      { name: "list_lakehouses", arguments: { workspaceId: WORKSPACE_ID } },
+      {
+        name: "get_lakehouse",
+        arguments: { workspaceId: WORKSPACE_ID, lakehouseId: MODEL_ID },
+      },
+      {
+        name: "list_lakehouse_tables",
+        arguments: { workspaceId: WORKSPACE_ID, lakehouseId: MODEL_ID },
+      },
+      { name: "list_warehouses", arguments: { workspaceId: WORKSPACE_ID } },
+      {
+        name: "get_warehouse",
+        arguments: { workspaceId: WORKSPACE_ID, warehouseId: MODEL_ID },
+      },
+      {
+        name: "inspect_data_source_schema",
+        arguments: {
+          workspaceId: WORKSPACE_ID,
+          itemType: "lakehouse",
+          itemId: MODEL_ID,
+        },
+      },
+      {
+        name: "sample_data_source_table",
+        arguments: {
+          workspaceId: WORKSPACE_ID,
+          itemType: "warehouse",
+          itemId: MODEL_ID,
+          schemaName: "dbo",
+          tableName: "Sales",
+        },
+      },
       { name: "get_semantic_model", arguments: ids },
       { name: "get_semantic_model_definition", arguments: ids },
       { name: "get_model_info", arguments: ids },
@@ -244,7 +287,7 @@ describe("remote MCP end to end", () => {
         });
       },
     });
-    client = new Client({ name: "phase-five-redaction", version: "1.0.0" });
+    client = new Client({ name: "workflow-redaction", version: "1.0.0" });
     await client.connect(
       new StreamableHTTPClientTransport(new URL(`${testServer.baseUrl}/mcp`), {
         authProvider: { token: () => Promise.resolve(TEST_API_KEY) },

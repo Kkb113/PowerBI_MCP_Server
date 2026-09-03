@@ -9,6 +9,7 @@ import { createLogger } from "../src/logging.js";
 import type { JsonValue } from "../src/mcp/schemas.js";
 import type { ModelSpec } from "../src/model/index.js";
 import { SemanticModelService } from "../src/services/semantic-model-service.js";
+import { requireLiveTestWorkspaceId } from "./live-workspace.js";
 
 try {
   process.loadEnvFile();
@@ -30,7 +31,7 @@ const liveModel: ModelSpec = {
   annotations: [],
   tables: [
     {
-      name: "Phase 5 Data",
+      name: "Workflow Data",
       hidden: false,
       columns: [
         {
@@ -57,7 +58,7 @@ const liveModel: ModelSpec = {
       partitions: [
         {
           kind: "m",
-          name: "Phase 5 Data",
+          name: "Workflow Data",
           mode: "import",
           expression:
             "#table(type table [Key = Int64.Type, Amount = Currency.Type], {{1, 100.0}, {2, 200.0}})",
@@ -66,9 +67,9 @@ const liveModel: ModelSpec = {
       ],
       measures: [
         {
-          name: "Phase 5 Total",
-          expression: "SUM('Phase 5 Data'[Amount])",
-          description: "Disposable Phase 5 DAX smoke measure.",
+          name: "Workflow Total",
+          expression: "SUM('Workflow Data'[Amount])",
+          description: "Disposable DAX and refresh verification measure.",
           formatString: "#,0.00",
           hidden: false,
           annotations: [],
@@ -108,27 +109,23 @@ interface ToolEnvelope {
 const parseEnvelope = (value: unknown): ToolEnvelope => value as ToolEnvelope;
 
 async function main(): Promise<void> {
-  if (process.env["PHASE5_LIVE_MUTATION"] !== "true") {
+  if (process.env["LIVE_DAX_REFRESH_MUTATION"] !== "true") {
     throw new ConfigurationError([
-      "PHASE5_LIVE_MUTATION must be true for the disposable Phase 5 live check.",
+      "LIVE_DAX_REFRESH_MUTATION must be true for the disposable DAX and refresh live check.",
     ]);
   }
-  if (process.env["PHASE5_LIVE_PERMANENT_DELETE"] !== "true") {
+  if (process.env["LIVE_DAX_REFRESH_PERMANENT_DELETE"] !== "true") {
     throw new ConfigurationError([
-      "PHASE5_LIVE_PERMANENT_DELETE must be true because cleanup is irreversible.",
+      "LIVE_DAX_REFRESH_PERMANENT_DELETE must be true because cleanup is irreversible.",
     ]);
   }
   const config = loadConfig();
   if (config.readOnly) {
     throw new ConfigurationError([
-      "POWERBI_MCP_READONLY must be false for the disposable Phase 5 live check.",
+      "POWERBI_MCP_READONLY must be false for the disposable DAX and refresh live check.",
     ]);
   }
-  if (config.allowedWorkspaceIds.length !== 1) {
-    throw new ConfigurationError([
-      "FABRIC_ALLOWED_WORKSPACE_IDS must contain exactly one development workspace.",
-    ]);
-  }
+  const workspaceId = requireLiveTestWorkspaceId();
 
   const knownSecrets = [
     config.apiKey,
@@ -136,10 +133,9 @@ async function main(): Promise<void> {
   ];
   const logger = createLogger({ level: config.logLevel, knownSecrets });
   const server = createServer(createHttpApp(config, logger));
-  const client = new Client({ name: "phase-five-live-check", version: "1.0.0" });
-  const workspaceId = config.allowedWorkspaceIds[0]!;
+  const client = new Client({ name: "dax-refresh-live-check", version: "1.0.0" });
   const suffix = `${new Date().toISOString().replaceAll(/[-:.TZ]/gu, "")}-${randomUUID().slice(0, 8)}`;
-  const displayName = `MCP Phase 5 ${suffix}`;
+  const displayName = `MCP DAX Refresh Verification ${suffix}`;
   let semanticModelId: string | undefined;
   let connected = false;
   let primaryError: unknown;
@@ -169,7 +165,7 @@ async function main(): Promise<void> {
     const preview = await call("create_semantic_model", {
       workspaceId,
       displayName,
-      description: "Disposable Phase 5 workflow validation model.",
+      description: "Disposable DAX and refresh workflow validation model.",
       model: liveModel,
     });
     if (preview.data?.["applied"] !== false)
@@ -178,7 +174,7 @@ async function main(): Promise<void> {
     const created = await call("create_semantic_model", {
       workspaceId,
       displayName,
-      description: "Disposable Phase 5 workflow validation model.",
+      description: "Disposable DAX and refresh workflow validation model.",
       model: liveModel,
       apply: true,
     });
@@ -249,7 +245,7 @@ async function main(): Promise<void> {
       throw new Error("The disposable model refresh reached a failed terminal state.");
     }
 
-    const validation = await call("validate_dax", { ...ids, expression: "[Phase 5 Total]" });
+    const validation = await call("validate_dax", { ...ids, expression: "[Workflow Total]" });
     if (validation.data?.["valid"] !== true) throw new Error("Valid DAX did not pass validation.");
     const invalid = await call("validate_dax", { ...ids, expression: "SUM(" });
     if (invalid.data?.["valid"] !== false) throw new Error("Invalid DAX was not rejected.");
@@ -257,7 +253,7 @@ async function main(): Promise<void> {
 
     const query = await call("execute_dax", {
       ...ids,
-      query: 'EVALUATE ROW("Smoke", [Phase 5 Total])',
+      query: 'EVALUATE ROW("Smoke", [Workflow Total])',
       maxRows: 1,
       includeNulls: true,
     });
@@ -339,7 +335,7 @@ async function main(): Promise<void> {
     semanticModelId !== undefined && evidence["permanentDeleteVerified"] !== true;
   if (primaryError instanceof Error) throw primaryError;
   if (primaryError !== undefined)
-    throw new Error("The Phase 5 live check failed.", { cause: primaryError });
+    throw new Error("The DAX and refresh live check failed.", { cause: primaryError });
   process.stdout.write(`${JSON.stringify({ ok: true, ...evidence })}\n`);
 }
 
@@ -350,6 +346,6 @@ try {
     level: "error",
     knownSecrets: [process.env["MCP_API_KEY"] ?? "", process.env["AZURE_CLIENT_SECRET"] ?? ""],
   });
-  logger.error("Phase 5 live MCP workflow check failed", { error });
+  logger.error("DAX and refresh live MCP workflow check failed", { error });
   process.exitCode = 1;
 }

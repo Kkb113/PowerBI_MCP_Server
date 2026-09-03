@@ -8,6 +8,7 @@ import {
   buildDaxValidationProbe,
   McpWorkflowService,
 } from "../../src/services/mcp-workflow-service.js";
+import type { FabricDataService } from "../../src/services/fabric-data-service.js";
 import {
   summarizeModel,
   type ModelSnapshot,
@@ -24,7 +25,7 @@ const model = loadModelFixture();
 const snapshot: ModelSnapshot = {
   item: {
     id: MODEL_ID,
-    displayName: "Phase 5 Model",
+    displayName: "Workflow Model",
     type: "SemanticModel",
     workspaceId: WORKSPACE_ID,
   },
@@ -95,15 +96,30 @@ const createHarness = (
     startRefresh,
     getRefreshExecutionDetails,
   } as unknown as Pick<PowerBiClient, "executeDax" | "startRefresh" | "getRefreshExecutionDetails">;
+  const listLakehouses = vi.fn().mockResolvedValue({ value: [] });
+  const inspectSchema = vi.fn().mockResolvedValue({ columns: [], truncated: false });
+  const sampleTable = vi.fn().mockResolvedValue({ rows: [], returnedRows: 0, truncated: false });
+  const fabricData = {
+    listLakehouses,
+    getLakehouse: vi.fn().mockResolvedValue({}),
+    listLakehouseTables: vi.fn().mockResolvedValue({ value: [] }),
+    listWarehouses: vi.fn().mockResolvedValue({ value: [] }),
+    getWarehouse: vi.fn().mockResolvedValue({}),
+    inspectSchema,
+    sampleTable,
+  } as unknown as FabricDataService;
   return {
     semanticModels,
     semanticModelMocks: { listWorkspaces, listSemanticModels, createSemanticModel, getSnapshot },
     fabric,
     powerBi,
+    fabricData,
+    fabricDataMocks: { listLakehouses, inspectSchema, sampleTable },
     powerBiMocks: { executeDax, startRefresh, getRefreshExecutionDetails },
-    service: new McpWorkflowService(semanticModels, fabric, powerBi, {
+    service: new McpWorkflowService(semanticModels, fabric, powerBi, fabricData, {
       maxDaxRows: options.maxRows ?? 2,
       maxResponseBytes: options.maxBytes ?? 8_192,
+      maxDataResponseBytes: options.maxBytes ?? 8_192,
       readOnly: options.readOnly ?? false,
     }),
   };
@@ -167,6 +183,64 @@ describe("McpWorkflowService", () => {
       }),
     ).resolves.not.toHaveProperty("data.transaction.model");
     expect(semanticModelMocks.listWorkspaces).toHaveBeenCalled();
+  });
+
+  it("routes bounded Lakehouse and Warehouse discovery and inspection", async () => {
+    const { service, fabricDataMocks } = createHarness();
+
+    await expect(
+      service.execute("list_lakehouses", { workspaceId: WORKSPACE_ID, limit: 25 }),
+    ).resolves.toMatchObject({ status: "success", data: { value: [] } });
+    await service.execute("get_lakehouse", {
+      workspaceId: WORKSPACE_ID,
+      lakehouseId: MODEL_ID,
+    });
+    await service.execute("list_lakehouse_tables", {
+      workspaceId: WORKSPACE_ID,
+      lakehouseId: MODEL_ID,
+    });
+    await service.execute("list_warehouses", { workspaceId: WORKSPACE_ID });
+    await service.execute("get_warehouse", {
+      workspaceId: WORKSPACE_ID,
+      warehouseId: MODEL_ID,
+    });
+    await service.execute("inspect_data_source_schema", {
+      workspaceId: WORKSPACE_ID,
+      itemType: "lakehouse",
+      itemId: MODEL_ID,
+      schemaName: "dbo",
+      maxColumns: 50,
+    });
+    await service.execute("sample_data_source_table", {
+      workspaceId: WORKSPACE_ID,
+      itemType: "warehouse",
+      itemId: MODEL_ID,
+      schemaName: "dbo",
+      tableName: "Sales",
+      columns: ["Amount"],
+      maxRows: 10,
+    });
+
+    expect(fabricDataMocks.listLakehouses).toHaveBeenCalledWith(WORKSPACE_ID, {
+      limit: 25,
+      continuationToken: undefined,
+    });
+    expect(fabricDataMocks.inspectSchema).toHaveBeenCalledWith({
+      workspaceId: WORKSPACE_ID,
+      itemType: "lakehouse",
+      itemId: MODEL_ID,
+      schemaName: "dbo",
+      maxColumns: 50,
+    });
+    expect(fabricDataMocks.sampleTable).toHaveBeenCalledWith({
+      workspaceId: WORKSPACE_ID,
+      itemType: "warehouse",
+      itemId: MODEL_ID,
+      schemaName: "dbo",
+      tableName: "Sales",
+      columns: ["Amount"],
+      maxRows: 10,
+    });
   });
 
   it("caps JSON DAX rows at the lower server limit and reports Power BI truncation", async () => {
@@ -310,7 +384,7 @@ describe("McpWorkflowService", () => {
           workspaceId: WORKSPACE_ID,
           semanticModelId: MODEL_ID,
           confirmSemanticModelId: MODEL_ID,
-          confirmDisplayName: "Phase 5 Model",
+          confirmDisplayName: "Workflow Model",
           confirmPermanentDelete: true,
           apply: true,
         },

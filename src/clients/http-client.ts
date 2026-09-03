@@ -4,11 +4,13 @@ import { redact } from "../logging.js";
 import type { AccessTokenProvider, TokenAudience } from "../identity.js";
 import { ApiError, type ExternalService } from "./errors.js";
 
+type HttpService = Exclude<TokenAudience, "fabric-sql">;
+
 export type HttpMethod = "DELETE" | "GET" | "PATCH" | "POST" | "PUT";
 export type RetryMode = "never" | "safe";
 
 export interface HttpClientOptions {
-  readonly baseUrls: Readonly<Record<TokenAudience, string>>;
+  readonly baseUrls: Readonly<Record<HttpService, string>>;
   readonly timeoutMs: number;
   readonly maxRetries: number;
   readonly maxResponseBytes: number;
@@ -21,7 +23,7 @@ export interface HttpClientOptions {
 }
 
 export interface ApiRequest<T> {
-  readonly service: TokenAudience;
+  readonly service: HttpService;
   readonly operation: string;
   readonly method: HttpMethod;
   readonly path: string;

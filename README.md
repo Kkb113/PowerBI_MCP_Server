@@ -1,224 +1,207 @@
 # Fabric Semantic Model MCP Server
 
-A remote Model Context Protocol server for managing Microsoft Fabric semantic models. The
-project is implemented in strict TypeScript and follows the six-phase plan in
-[`implementation.md`](./implementation.md).
+Production Model Context Protocol (MCP) server for creating, inspecting, updating, querying,
+refreshing, and permanently deleting Microsoft Fabric semantic models. The service also exposes
+read-only Lakehouse and Warehouse discovery, schema inspection, and bounded table sampling so an
+AI agent can understand source data before constructing a model.
 
-## Current status
+The application is a stateless TypeScript service designed for Linux containers. It supports
+Microsoft Entra service-principal authentication on Render and Azure managed identity on Azure
+Container Apps.
 
-Phases 1 through 6 are implemented. All 18 frozen MCP tools use the tested Microsoft clients,
-semantic-model lifecycle service, deterministic model engine, bounded JSON DAX execution, refresh
-tracking, snapshots, diffs, and pre-deployment checks. Release candidate `0.1.0-rc.1` adds a pinned,
-non-root production container, Render configuration, Azure deployment guidance, container CI, and
-twice-through live verification.
+## Capabilities
 
-Available now:
+- Streamable HTTP MCP transport at `POST /mcp`.
+- Health and readiness probes at `GET /health` and `GET /ready`.
+- Bearer authentication, host validation, browser-origin validation, and secret-safe structured
+  logging.
+- Runtime workspace discovery governed by Entra and Fabric permissions; no workspace ID is stored
+  in application configuration.
+- Semantic-model creation, property updates, definition reads, atomic object CRUD, connection
+  binding, DAX validation and execution, refresh management, snapshots, diffs, and deployment
+  validation.
+- Deterministic TMSL encoding, semantic validation, dependency checks, stable SHA-256 hashes, and
+  optimistic concurrency protection.
+- Preview-first mutations and strong permanent-delete confirmation.
+- Fabric Lakehouse and Warehouse discovery through Fabric REST APIs.
+- Read-only SQL endpoint metadata inspection and bounded table sampling without exposing arbitrary
+  SQL execution.
+- Bounded HTTP retries, timeouts, pagination, long-running-operation polling, row counts, and
+  response sizes.
+- Reproducible multi-stage container build running as an unprivileged user.
 
-- Stateless Streamable HTTP at `POST /mcp`.
-- Public, minimal `GET /health` and `GET /ready` probes.
-- Constant-time bearer-token verification for `/mcp`.
-- Host and browser-origin allowlists.
-- Frozen tool input/output schemas and safety annotations.
-- Static capability and safety resources.
-- Structured logs with recursive secret redaction.
-- Azure Identity client-secret and `DefaultAzureCredential` authentication modes.
-- Separate cached tokens for the Fabric and Power BI resource scopes.
-- Workspace-allowlisted Fabric and Power BI clients with read-only enforcement.
-- Bounded HTTP timeouts, response sizes, pagination, typed errors, request IDs, and safe retries.
-- Unit, contract, integration, and real MCP-client end-to-end tests.
-- Strict user-facing `ModelSpec` and supported TMSL `model.bim` contracts.
-- TMSL `model.bim` and `definition.pbism` base64 definition codecs with optional-part preservation.
-- Atomic CRUD batches for data sources, expressions, tables, columns, partitions, measures,
-  relationships, hierarchies, calculation groups/items, and roles.
-- Semantic invariants, dependency conflict reporting, stable SHA-256 hashes, and semantic diffs.
-- DAX quoting, reference extraction, and advisory lint rules ported from the Python reference.
-- A deliberately partial DAX function catalog whose unknown-function findings are informational and
-  explicitly non-blocking; Fabric or Power BI remains the authoritative DAX validator.
-- A golden local definition fixture covering Unicode, apostrophes, multiline DAX/M, all supported
-  partition sources, calculation groups, hierarchies, relationships, and RLS.
-- Preview-first create, property update, definition mutation, connection binding, and permanent-delete
-  lifecycle operations.
-- Optimistic concurrency through required semantic definition hashes on model updates.
-- Bounded Fabric long-running-operation polling with operation handles returned on timeout.
-- Post-write definition hash and object-count verification.
-- Repeated-ID, exact-name, and explicit irreversible confirmation for permanent deletion.
-- Scoped continuation tokens and bounded model metadata summaries.
-- Scalar and query-form DAX validation against a deployed model.
-- Server-capped JSON DAX rows, output bytes, truncation reasons, and stable query errors.
-- Preview-first transactional refresh start plus resumable terminal-status diagnostics.
-- Normalized model snapshots, operation-aware diffs, and configurable pre-deployment checks.
-- Response-boundary secret redaction and centralized read-only enforcement before applied workflows.
-- A multi-stage Node.js 24.14.0 Debian-slim image containing production dependencies only.
-- Automated non-root, read-only-filesystem, health, MCP, restart, logging, and SIGTERM checks.
-- A safe-by-default Render Blueprint and an Azure Container Apps operating runbook.
+## Architecture
 
-## Requirements
+```mermaid
+flowchart LR
+    Agent[AI agent or MCP client] -->|HTTPS and bearer token| HTTP[Express HTTP boundary]
+    HTTP --> MCP[MCP registry and workflow router]
+    MCP --> Lifecycle[Semantic-model lifecycle service]
+    MCP --> Data[Fabric data inspection service]
+    Lifecycle --> Engine[Deterministic TMSL model engine]
+    Lifecycle --> Fabric[Fabric REST API]
+    Lifecycle --> PowerBI[Power BI REST API]
+    Data --> Fabric
+    Data --> SQL[Fabric SQL endpoints]
+    Fabric --> Entra[Microsoft Entra ID]
+    PowerBI --> Entra
+    SQL --> Entra
+```
 
-- Node.js 24.14.0
-- npm 11.9.0
-- Docker Engine with Linux container support for the container release gate
+The HTTP boundary authenticates every MCP request before invoking a tool. The workflow layer
+applies safety policies and delegates to typed services. Microsoft remains authoritative for
+workspace, item, model, and SQL authorization. The process writes no credentials, model state, or
+query results to local storage.
 
-The exact Node version is recorded in `.nvmrc` and `.node-version`. Runtime and development
-dependency versions are exact and committed in `package-lock.json`.
+### Repository layout
 
-## Local setup
+| Path                    | Purpose                                                                           |
+| ----------------------- | --------------------------------------------------------------------------------- |
+| `src/clients`           | Entra-authenticated Fabric, Power BI, and Fabric SQL clients                      |
+| `src/http`              | Express application, probes, request security, and MCP transport                  |
+| `src/mcp`               | Published tools, resources, schemas, and server integration                       |
+| `src/model`             | TMSL codec, model schemas, validation, DAX analysis, hashing, and mutation engine |
+| `src/services`          | Semantic-model and data-inspection workflow orchestration                         |
+| `scripts`               | Container and explicitly authorized live verification utilities                   |
+| `tests`                 | Contract, unit, integration, end-to-end, and golden-fixture tests                 |
+| `docs/adr`              | Current architectural decisions and constraints                                   |
+| `docs/deployment.md`    | Render and Azure deployment and rollback runbook                                  |
+| `docs/test-evidence.md` | Verified production release evidence                                              |
+
+## Prerequisites
+
+### Build and runtime
+
+- Node.js `24.14.0`
+- npm `11.9.0`
+- Docker with Linux-container support for image verification and container deployment
+- Network access to Microsoft Entra, Fabric, and Power BI over HTTPS
+- Outbound TCP `1433` to `*.datawarehouse.fabric.microsoft.com` when SQL schema inspection or table
+  sampling is required
+
+The Node.js version is pinned in `.node-version`, `.nvmrc`, and the Dockerfile. Application and
+development dependencies are locked in `package-lock.json`.
+
+### Microsoft tenant and workspace
+
+1. Register a Microsoft Entra application or configure an Azure managed identity.
+2. Enable the Fabric tenant setting that permits service principals to use Fabric APIs.
+3. Add the identity directly to each required Fabric workspace. Use Viewer/Read permissions for
+   discovery-only scenarios and Contributor or higher only where model mutations are approved.
+4. Grant the identity access to each Lakehouse SQL analytics endpoint or Warehouse that it must
+   inspect.
+5. Enable the Power BI tenant setting for Dataset Execute Queries REST API when DAX execution is
+   required, and grant the identity semantic-model Read and Build permissions.
+
+Access to a workspace is effective as soon as Fabric returns it to the configured identity. No
+application redeployment or workspace configuration change is required.
+
+## Installation and local execution
+
+Install the locked dependencies and create a local configuration file:
 
 ```powershell
 npm ci
 Copy-Item .env.example .env
 ```
 
-Replace `MCP_API_KEY` in `.env` with at least 32 random characters. Configure the Azure and
-workspace variables described below before running a live client check. This project does not load
-`.env` automatically, so export the variables through your shell or process manager before
-starting it. For example:
+Populate `.env` with a strong `MCP_API_KEY` and the appropriate Entra settings. The application does
+not automatically read `.env`; use a secret-aware process manager or Node's environment-file option:
 
 ```powershell
-$env:MCP_API_KEY = "replace-with-a-long-random-development-key"
+npm run build
+node --env-file=.env dist/index.js
+```
+
+For watch mode, export the required variables into the shell or IDE process environment before
+running:
+
+```powershell
 npm run dev
 ```
 
-The default address is `http://localhost:3000`. Requests to `/mcp` must include:
+The default local endpoint is `http://localhost:3000/mcp`. MCP requests require:
 
 ```text
 Authorization: Bearer <MCP_API_KEY>
 ```
 
-`MCP_ALLOWED_HOSTS` and `MCP_ALLOWED_ORIGINS` are comma-separated hostname lists without schemes
-or ports. `localhost`, `127.0.0.1`, and `[::1]` are the defaults. A Render hostname supplied in
-`RENDER_EXTERNAL_HOSTNAME` is added to the host allowlist automatically.
-
-## Verification
-
-Run the entire local quality gate:
-
-```powershell
-npm run check
-```
-
-The gate checks formatting, lint rules, TypeScript types, coverage thresholds, and the production
-build. To run only the protocol-level end-to-end test:
-
-```powershell
-npm run test:e2e
-```
-
-Those tests start the HTTP service on an ephemeral port and use the official MCP TypeScript client
-to initialize, list tools, list and read resources, and call every frozen tool through the Phase 5
-workflow router and bearer authentication. They run the Microsoft clients against a real local HTTP fixture to verify
-audience-specific bearer tokens, request serialization, response parsing, and allowlisting. The
-model pipeline test validates a golden TMSL definition, applies a multi-object atomic batch,
-serializes it into Fabric definition parts, reads it back, and verifies an identical semantic hash.
-
-Build and exercise the production image:
-
-```powershell
-npm run test:container
-```
-
-This verifies the exact Node runtime, non-root execution, production-only dependencies, read-only
-filesystem compatibility, probes, unauthenticated rejection, authenticated MCP discovery, restart
-recovery, secret-free logs, and graceful shutdown. Docker is intentionally a separate release gate
-so ordinary unit development does not require a local daemon.
-
-An opt-in live smoke check performs only workspace and semantic-model reads:
-
-```powershell
-npm run test:live
-```
-
-The command requires `MCP_API_KEY`, valid Azure credentials, at least one
-`FABRIC_ALLOWED_WORKSPACE_IDS` entry, and `POWERBI_MCP_READONLY=true`. It refuses to run when
-read-only mode is disabled.
-
-The Phase 4 live lifecycle check is intentionally separate because it creates, mutates, and
-permanently deletes one uniquely named disposable model. Fabric item recovery does not currently
-support semantic models, so the check requires exactly one development workspace, write mode, an
-explicit mutation acknowledgement, and a separate permanent-delete acknowledgement:
-
-```powershell
-$env:PHASE4_LIVE_MUTATION = "true"
-$env:PHASE4_LIVE_PERMANENT_DELETE = "true"
-$env:POWERBI_MCP_READONLY = "false"
-npm run test:live:phase4
-```
-
-The script loads local values from `.env`, previews creation first, verifies representative object
-create/update/delete batches and a stale-hash rejection, then permanently deletes only the model
-created by that run after repeating its ID and exact current name. Its self-contained model has no
-external data source, so connection binding is reported as not applicable. Connection binding is
-covered by unit and real-HTTP end-to-end fixtures.
-
-The Phase 5 live check creates a uniquely named self-contained model through an actual local MCP
-HTTP client, runs snapshot/diff/gate workflows, starts and follows a full refresh, validates both
-valid and invalid DAX, executes a one-row smoke query, and permanently deletes the disposable model:
-
-```powershell
-$env:PHASE5_LIVE_MUTATION = "true"
-$env:PHASE5_LIVE_PERMANENT_DELETE = "true"
-$env:POWERBI_MCP_READONLY = "false"
-npm run test:live:phase5
-```
-
-It requires exactly one allowlisted development workspace. Cleanup runs in `finally`, with a direct
-Fabric fallback if the MCP connection is unavailable.
-
-The Phase 6 release-candidate check runs a complete disposable lifecycle twice. In addition to the
-Phase 5 workflow, it verifies item property updates, representative measure and hierarchy CRUD,
-optimistic-concurrency rejection, definition readback, and post-delete absence:
-
-```powershell
-$env:PHASE6_LIVE_MUTATION = "true"
-$env:PHASE6_LIVE_PERMANENT_DELETE = "true"
-$env:POWERBI_MCP_READONLY = "false"
-npm run test:live:phase6
-```
-
-It is intentionally fixed at two sequential runs and requires exactly one allowlisted development
-workspace. See [`docs/test-evidence.md`](./docs/test-evidence.md) for the complete release gate and
-recorded results.
-
 ## Configuration
 
-| Variable                       |    Required | Default        | Description                                                                      |
-| ------------------------------ | ----------: | -------------- | -------------------------------------------------------------------------------- |
-| `MCP_API_KEY`                  |         Yes | None           | MCP bearer secret with at least 32 characters.                                   |
-| `NODE_ENV`                     |          No | `development`  | `development`, `test`, or `production`.                                          |
-| `HOST`                         |          No | `0.0.0.0`      | HTTP bind host.                                                                  |
-| `PORT`                         |          No | `3000`         | HTTP port.                                                                       |
-| `MCP_ALLOWED_HOSTS`            |          No | Local hosts    | Host-header allowlist.                                                           |
-| `MCP_ALLOWED_ORIGINS`          |          No | Host allowlist | Browser Origin-hostname allowlist.                                               |
-| `RENDER_EXTERNAL_HOSTNAME`     |          No | None           | Render hostname appended to allowed hosts.                                       |
-| `LOG_LEVEL`                    |          No | `info`         | `debug`, `info`, `warn`, or `error`.                                             |
-| `AZURE_AUTH_MODE`              |          No | `auto`         | `auto`, `client-secret`, or `default`.                                           |
-| `AZURE_TENANT_ID`              | Conditional | None           | Tenant UUID; required with client-secret authentication.                         |
-| `AZURE_CLIENT_ID`              | Conditional | None           | Application UUID for Render or managed-identity client UUID for Azure.           |
-| `AZURE_CLIENT_SECRET`          | Conditional | None           | Required for client-secret authentication; keep it in the platform secret store. |
-| `FABRIC_ALLOWED_WORKSPACE_IDS` |          No | Empty          | Comma-separated workspace UUIDs; an empty list denies every workspace.           |
-| `POWERBI_MCP_READONLY`         |          No | `true`         | Blocks create, update, delete, bind, and refresh calls when true.                |
-| `HTTP_TIMEOUT_MS`              |          No | `30000`        | Per-attempt external HTTP timeout.                                               |
-| `HTTP_MAX_RETRIES`             |          No | `2`            | Retry count for explicitly safe reads only.                                      |
-| `HTTP_MAX_PAGES`               |          No | `100`          | Pagination safety limit.                                                         |
-| `HTTP_MAX_RESPONSE_BYTES`      |          No | `10485760`     | Maximum external response body size.                                             |
-| `LRO_POLL_BUDGET_MS`           |          No | `60000`        | Maximum time spent synchronously polling one Fabric long-running operation.      |
-| `DAX_MAX_ROWS`                 |          No | `1000`         | Server-side maximum DAX rows returned to an MCP caller.                          |
-| `DAX_MAX_RESPONSE_BYTES`       |          No | `1048576`      | Maximum serialized DAX/tool data returned to an MCP caller.                      |
+All production configuration is supplied at runtime. Never commit `.env`, credentials, access
+tokens, Fabric item IDs, or workspace IDs.
 
-Configuration is validated before the server binds a port. Error messages name invalid variables
-but never include their values.
+| Variable                   |    Required | Default           | Description                                                                                              |
+| -------------------------- | ----------: | ----------------- | -------------------------------------------------------------------------------------------------------- |
+| `MCP_API_KEY`              |         Yes | None              | Bearer secret with at least 32 characters. Generate and store it in the hosting platform's secret store. |
+| `NODE_ENV`                 |          No | `development`     | Runtime mode: `development`, `test`, or `production`.                                                    |
+| `HOST`                     |          No | `0.0.0.0`         | HTTP bind host.                                                                                          |
+| `PORT`                     |          No | `3000`            | HTTP listening port. Render supplies this automatically.                                                 |
+| `MCP_ALLOWED_HOSTS`        |          No | Local hosts       | Comma-separated hostnames without schemes or ports.                                                      |
+| `MCP_ALLOWED_ORIGINS`      |          No | Allowed hosts     | Comma-separated browser Origin hostnames without schemes or ports.                                       |
+| `RENDER_EXTERNAL_HOSTNAME` |      Render | Platform supplied | Render hostname automatically added to allowed hosts.                                                    |
+| `LOG_LEVEL`                |          No | `info`            | `debug`, `info`, `warn`, or `error`.                                                                     |
+| `AZURE_AUTH_MODE`          |          No | `auto`            | `client-secret`, `default`, or `auto`. `auto` selects client-secret mode when a client secret exists.    |
+| `AZURE_TENANT_ID`          | Conditional | None              | Tenant UUID for client-secret authentication.                                                            |
+| `AZURE_CLIENT_ID`          | Conditional | None              | Application UUID, or user-assigned managed-identity client UUID.                                         |
+| `AZURE_CLIENT_SECRET`      | Conditional | None              | Required in client-secret mode. Store only as a platform secret.                                         |
+| `POWERBI_MCP_READONLY`     |          No | `true`            | Blocks applied create, update, delete, bind, and refresh operations when `true`.                         |
+| `HTTP_TIMEOUT_MS`          |          No | `30000`           | Per-attempt Microsoft API and SQL timeout.                                                               |
+| `HTTP_MAX_RETRIES`         |          No | `2`               | Retry count for operations explicitly classified as safe.                                                |
+| `HTTP_MAX_PAGES`           |          No | `100`             | Maximum Microsoft API pages followed by one request.                                                     |
+| `HTTP_MAX_RESPONSE_BYTES`  |          No | `10485760`        | Maximum Microsoft API response body size.                                                                |
+| `LRO_POLL_BUDGET_MS`       |          No | `60000`           | Maximum synchronous Fabric long-running-operation polling time.                                          |
+| `DAX_MAX_ROWS`             |          No | `1000`            | Maximum DAX rows returned by the server.                                                                 |
+| `DAX_MAX_RESPONSE_BYTES`   |          No | `1048576`         | Maximum serialized DAX response size.                                                                    |
+| `DATA_MAX_ROWS`            |          No | `100`             | Maximum Lakehouse/Warehouse sample rows returned by the server.                                          |
+| `DATA_MAX_RESPONSE_BYTES`  |          No | `1048576`         | Maximum serialized data-inspection response size.                                                        |
 
-## Deployment
+Configuration is validated before the server binds a port. Validation messages identify invalid
+variable names without returning their values.
 
-The production container is prepared for Render but Phase 6 does not deploy it. The root
-[`render.yaml`](./render.yaml) starts in read-only mode and prompts for every credential or
-tenant-specific value. [`docs/deployment.md`](./docs/deployment.md) gives the full Render procedure,
-health checks, rollback steps, and the later Azure Container Apps configuration using the same
-image.
+## MCP interface
 
-## Frozen Phase 1 contract
+The server publishes 25 tools. Input schemas, read/write classifications, and safety annotations
+are defined centrally in `src/mcp/registry.ts` and protected by contract tests.
 
-The MCP surface is defined once in `src/mcp/registry.ts`, and a parity test prevents the advertised
-tools, safety classification, schemas, and write-tool set from drifting. The common tool result is:
+### Discovery and source inspection
+
+- `list_workspaces`
+- `list_semantic_models`
+- `list_lakehouses`
+- `get_lakehouse`
+- `list_lakehouse_tables`
+- `list_warehouses`
+- `get_warehouse`
+- `inspect_data_source_schema`
+- `sample_data_source_table`
+
+### Semantic-model lifecycle
+
+- `get_semantic_model`
+- `get_semantic_model_definition`
+- `get_model_info`
+- `create_semantic_model`
+- `update_semantic_model_properties`
+- `apply_model_changes`
+- `delete_semantic_model`
+- `bind_semantic_model_connection`
+
+### DAX, refresh, and asynchronous operations
+
+- `validate_dax`
+- `execute_dax`
+- `refresh_semantic_model`
+- `get_refresh_status`
+- `get_operation_status`
+
+### Analysis and deployment validation
+
+- `model_snapshot`
+- `model_diff`
+- `pre_deploy_gate`
+
+Every tool returns a consistent result envelope:
 
 ```json
 {
@@ -230,48 +213,143 @@ tools, safety classification, schemas, and write-tool set from drifting. The com
 }
 ```
 
-The frozen tools are documented in [`implementation.md`](./implementation.md#6-proposed-first-release-mcp-surface).
-The server publishes `fabric://reference/capabilities` and `fabric://reference/safety` as static,
+The server also publishes `fabric://reference/capabilities` and `fabric://reference/safety` as
 read-only MCP resources.
 
-## Security boundary
+## Safe operating model
 
-- Never pass credentials, access tokens, tenant secrets, or connection secrets as MCP arguments.
-- Health and readiness responses expose only a status value.
-- Missing and invalid bearer credentials receive the same response.
-- The MCP service is stateless; no model definitions or credentials are written locally.
-- An empty workspace allowlist denies all Fabric and Power BI client calls.
-- External writes are blocked by default. Unsafe requests are never automatically retried.
-- Applied MCP workflows are rejected at the central router when read-only mode is enabled, before
-  any preparatory reads or external writes occur.
-- Query rows, full model definitions, and refresh exception payloads are never logged.
+1. Keep `POWERBI_MCP_READONLY=true` during deployment validation and source discovery.
+2. Use `list_workspaces` to discover only workspaces visible to the configured identity.
+3. Inspect Lakehouse/Warehouse metadata and bounded samples before preparing a model definition.
+4. Preview every semantic-model mutation before setting `apply: true`.
+5. Supply the current definition hash for model object changes. A stale hash fails before write.
+6. Treat deletion as irreversible. Applied deletion requires the model ID twice, the exact current
+   display name, an explicit permanent-delete flag, and `apply: true`.
+7. Return to read-only mode whenever mutation access is not actively required.
 
-Bearer authentication is the initial Render test boundary. Microsoft Entra protection is planned
-for the later Azure deployment phase.
+`sample_data_source_table` accepts only item, schema, table, optional column identifiers, and a row
+limit. The server validates and quotes identifiers and constructs a single bounded `SELECT TOP`
+statement. MCP callers cannot provide arbitrary T-SQL.
 
-## DAX and refresh REST limitations
+## Verification
 
-The first release deliberately uses Power BI's JSON
-[`executeQueries`](https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/execute-queries-in-group)
-endpoint. Microsoft limits it to one query and one result table, 100,000 rows or 1,000,000 values,
-15 MB, and 120 requests per minute. This server applies lower configurable output limits. Power BI
-can return partial data with HTTP 200 when a service limit is reached; the MCP result reports
-`truncated`, `truncationReasons`, and bounded warnings.
+Run the complete local quality gate:
 
-The Power BI tenant's Dataset Execute Queries REST API integration setting must be enabled, and the
-caller needs semantic-model Read and Build permissions. Microsoft does not support service-principal
-JSON queries against models with RLS or SSO enabled. The JSON contract has no request-culture field:
-omit `culture` to use the deployed model culture. Supplying a culture returns
-`DAX_CULTURE_OVERRIDE_UNSUPPORTED` rather than silently ignoring it. The newer Arrow endpoint can
-support explicit culture in a future opt-in adapter without changing this JSON-first contract.
+```powershell
+npm run check
+```
 
-Refresh starts use the asynchronous enhanced-refresh contract with transactional commit mode and no
-service-principal-incompatible notify option. `get_refresh_status` follows Power BI-owned state and
-returns bounded messages extracted from diagnostics instead of returning raw exception JSON.
+This runs formatting checks, ESLint, strict TypeScript compilation, unit/contract/integration/MCP
+end-to-end tests with coverage thresholds, and a production build.
 
-## Behavioral reference
+Verify the final Linux image:
 
-The Python behavioral reference is
-[`sulaiman013/powerbi-mcp`](https://github.com/sulaiman013/powerbi-mcp) at commit
-`977b4d126fed9dee7b8d6dade6d45dc5ac7064fb`. It is retained locally under the ignored
-`powerbi-mcp/` directory and is not bundled with this TypeScript service.
+```powershell
+npm run test:container
+```
+
+The container gate verifies the pinned runtime, production-only dependencies, non-root execution,
+read-only filesystem compatibility, dropped Linux capabilities, probes, authentication, MCP
+discovery, restart recovery, secret-free logs, and graceful shutdown.
+
+Credential-backed read-only checks are available after Microsoft configuration is complete:
+
+```powershell
+npm run test:live
+npm run test:live:data
+```
+
+Destructive verification commands operate only on uniquely named disposable models and require an
+explicit non-production workspace plus separate mutation and permanent-delete acknowledgements:
+
+| Command                         | Scope                                                 | Required acknowledgements                                                  |
+| ------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------- |
+| `npm run test:live:lifecycle`   | Semantic-model definition and object lifecycle        | `LIVE_LIFECYCLE_MUTATION=true`, `LIVE_LIFECYCLE_PERMANENT_DELETE=true`     |
+| `npm run test:live:dax-refresh` | MCP, DAX, snapshot, diff, gate, and refresh workflows | `LIVE_DAX_REFRESH_MUTATION=true`, `LIVE_DAX_REFRESH_PERMANENT_DELETE=true` |
+| `npm run test:live:full`        | Complete lifecycle twice with cleanup verification    | `LIVE_FULL_MUTATION=true`, `LIVE_FULL_PERMANENT_DELETE=true`               |
+
+All destructive checks additionally require `FABRIC_TEST_WORKSPACE_ID` and
+`POWERBI_MCP_READONLY=false`. Never point these utilities at a production workspace. Cleanup uses
+strong permanent-delete confirmation and fails the test if the created item cannot be removed.
+
+See `docs/test-evidence.md` for the currently verified release results.
+
+## Deployment
+
+The same Docker image is used for Render and Azure Container Apps. Follow
+`docs/deployment.md` for the complete deployment, validation, rollback, and identity procedures.
+
+### Render summary
+
+1. Create a Blueprint or Docker web service from `render.yaml`.
+2. Set `MCP_API_KEY`, `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, and `AZURE_CLIENT_SECRET` as secrets.
+3. Leave `POWERBI_MCP_READONLY=true` for initial validation.
+4. Verify `/health`, `/ready`, bearer rejection, MCP initialization, and read-only Fabric discovery.
+5. Enable mutation only after authorization and rollback procedures have been approved.
+
+Do not configure a workspace ID on Render. Fabric workspace membership assigned to the Entra
+application is the authorization boundary.
+
+### Azure summary
+
+Use the same image with Azure Container Apps. Prefer `AZURE_AUTH_MODE=default` and a managed identity
+instead of a client secret. Store the MCP bearer key in a secret reference or Azure Key Vault and
+grant Fabric workspace/item permissions directly to the managed identity.
+
+## Security considerations
+
+- Use least-privilege Fabric workspace and item permissions.
+- Keep the service in read-only mode unless approved mutation workflows are required.
+- Rotate the MCP bearer key and Entra secret through the hosting platform; restart instances after
+  rotation.
+- Restrict public ingress, allowed hosts, and browser origins to the intended MCP clients.
+- Terminate TLS at the hosting platform. Never expose the service over plaintext public HTTP.
+- Do not log or include credentials, access tokens, connection secrets, model definitions, DAX row
+  data, or sampled table values in support requests.
+- Review dependency and container scan findings before deployment.
+- Treat semantic-model deletion as permanent and non-recoverable.
+
+## Operations and maintenance
+
+- Use `/health` for liveness and `/ready` for readiness monitoring.
+- Monitor structured logs for error code, Microsoft request ID, operation name, retryability, and
+  duration. Normal logs intentionally omit request and response bodies.
+- Scale horizontally; the server is stateless and stores no local operation database.
+- Preserve client-side operation IDs returned when Fabric polling exceeds the configured budget and
+  resume with `get_operation_status`.
+- Re-run `npm run check` and `npm run test:container` after every dependency, Node.js, schema, or
+  deployment change.
+- Validate Microsoft API contract changes against typed response schemas and live read-only checks
+  before promotion.
+- Roll back by redeploying the last verified immutable image. Configuration rollback is independent
+  because all environment settings are runtime supplied.
+
+## Supported model boundary
+
+The service uses the TMSL `model.bim` representation as its canonical semantic-model definition. It
+supports structured data-source metadata without credentials; source and calculated columns; M,
+query, entity/Direct Lake, calculated, and calculation-group partitions; measures; single-column
+relationships; hierarchies; calculation groups and items; named M expressions; and read-only roles
+with table filters.
+
+Definitions containing unsupported or unmapped TMSL fields fail closed before mutation to prevent
+lossy full-definition replacement. Desktop-only operations, PBIX extraction, XMLA/TOM/ADOMD, a TMDL
+parser, arbitrary SQL execution, and persistent credential storage are outside the service boundary.
+
+Power BI JSON DAX execution is also subject to Microsoft service limitations. Service-principal
+queries are not supported by Microsoft for semantic models with RLS or SSO enabled. The service
+applies lower configurable response limits and reports partial/truncated results explicitly.
+
+## Additional documentation
+
+- `docs/deployment.md` — deployment, validation, rollback, and platform configuration
+- `docs/test-evidence.md` — current automated, container, and live verification evidence
+- `docs/adr` — architectural decisions, supported boundaries, and safety rationale
+- `THIRD_PARTY_NOTICES.md` — notices for incorporated runtime dependencies
+
+Microsoft API contracts and operational requirements are documented in the
+[Fabric REST API overview](https://learn.microsoft.com/en-us/rest/api/fabric/articles/),
+[Fabric identity support](https://learn.microsoft.com/en-us/rest/api/fabric/articles/identity-support),
+[semantic-model definition contract](https://learn.microsoft.com/en-us/rest/api/fabric/articles/item-management/definitions/semantic-model-definition),
+[Lakehouse API documentation](https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-api),
+and [Power BI Execute Queries documentation](https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/execute-queries-in-group).

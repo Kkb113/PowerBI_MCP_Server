@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
+import { TOOL_NAMES } from "../src/mcp/registry.js";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const suffix = randomUUID().slice(0, 8);
@@ -91,8 +92,8 @@ async function verifyHttpAndMcp(baseUrl: string): Promise<void> {
       }),
     );
     const tools = await client.listTools();
-    if (tools.tools.length !== 18) {
-      throw new Error(`Expected 18 MCP tools, received ${tools.tools.length}.`);
+    if (tools.tools.length !== TOOL_NAMES.length) {
+      throw new Error(`Expected ${TOOL_NAMES.length} MCP tools, received ${tools.tools.length}.`);
     }
     const resources = await client.listResources();
     if (resources.resources.length !== 2) {
@@ -179,7 +180,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ ok: true, nodeVersion: actualNodeVersion, nonRootUid: uid, toolCount: 18, resourceCount: 2, restartVerified: true, gracefulShutdownVerified: true })}\n`,
+    `${JSON.stringify({ ok: true, nodeVersion: actualNodeVersion, nonRootUid: uid, toolCount: TOOL_NAMES.length, resourceCount: 2, restartVerified: true, gracefulShutdownVerified: true })}\n`,
   );
 } finally {
   if (containerCreated) {

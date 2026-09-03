@@ -109,12 +109,10 @@ describe("Microsoft clients end to end", () => {
       logger,
     });
     const fabric = new FabricClient(http, {
-      allowedWorkspaceIds: [WORKSPACE_ID],
       readOnly: true,
       maxPages: 10,
     });
     const powerBi = new PowerBiClient(http, {
-      allowedWorkspaceIds: [WORKSPACE_ID],
       readOnly: true,
     });
 

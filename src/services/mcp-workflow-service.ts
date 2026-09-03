@@ -17,6 +17,7 @@ import { TOOL_REGISTRY, WRITE_TOOL_NAMES } from "../mcp/registry.js";
 import { jsonValueSchema, type JsonValue } from "../mcp/schemas.js";
 import type { SemanticModelService } from "./semantic-model-service.js";
 import { summarizeModel } from "./semantic-model-service.js";
+import type { FabricDataService } from "./fabric-data-service.js";
 
 type ToolName = (typeof TOOL_REGISTRY)[number]["name"];
 type ToolDefinition<Name extends ToolName> = Extract<
@@ -38,6 +39,7 @@ export interface McpToolHandler {
 export interface McpWorkflowOptions {
   readonly maxDaxRows: number;
   readonly maxResponseBytes: number;
+  readonly maxDataResponseBytes: number;
   readonly readOnly: boolean;
 }
 
@@ -45,6 +47,16 @@ type FabricOperations = Pick<FabricClient, "getOperationState">;
 type PowerBiOperations = Pick<
   PowerBiClient,
   "executeDax" | "startRefresh" | "getRefreshExecutionDetails"
+>;
+type FabricDataOperations = Pick<
+  FabricDataService,
+  | "listLakehouses"
+  | "getLakehouse"
+  | "listLakehouseTables"
+  | "listWarehouses"
+  | "getWarehouse"
+  | "inspectSchema"
+  | "sampleTable"
 >;
 
 const jsonRecordSchema = z.record(z.string(), jsonValueSchema);
@@ -285,6 +297,7 @@ export class McpWorkflowService implements McpToolHandler {
     private readonly semanticModels: SemanticModelService,
     private readonly fabric: FabricOperations,
     private readonly powerBi: PowerBiOperations,
+    private readonly fabricData: FabricDataOperations,
     private readonly options: McpWorkflowOptions,
   ) {
     z.number().int().min(1).max(10_000).parse(options.maxDaxRows);
@@ -319,6 +332,86 @@ export class McpWorkflowService implements McpToolHandler {
               ? {}
               : { continuationToken: input.continuationToken }),
           }),
+        );
+      }
+      case "list_lakehouses": {
+        const input = parseToolInput(name, rawInput);
+        return this.boundedSuccess(
+          "Fabric Lakehouses listed.",
+          await this.fabricData.listLakehouses(input.workspaceId, {
+            limit: input.limit,
+            continuationToken: input.continuationToken,
+          }),
+          this.options.maxDataResponseBytes,
+        );
+      }
+      case "get_lakehouse": {
+        const input = parseToolInput(name, rawInput);
+        return this.boundedSuccess(
+          "Fabric Lakehouse retrieved.",
+          await this.fabricData.getLakehouse(input.workspaceId, input.lakehouseId),
+          this.options.maxDataResponseBytes,
+        );
+      }
+      case "list_lakehouse_tables": {
+        const input = parseToolInput(name, rawInput);
+        return this.boundedSuccess(
+          "Lakehouse tables listed.",
+          await this.fabricData.listLakehouseTables(input.workspaceId, input.lakehouseId, {
+            limit: input.limit,
+            continuationToken: input.continuationToken,
+          }),
+          this.options.maxDataResponseBytes,
+        );
+      }
+      case "list_warehouses": {
+        const input = parseToolInput(name, rawInput);
+        return this.boundedSuccess(
+          "Fabric Warehouses listed.",
+          await this.fabricData.listWarehouses(input.workspaceId, {
+            limit: input.limit,
+            continuationToken: input.continuationToken,
+          }),
+          this.options.maxDataResponseBytes,
+        );
+      }
+      case "get_warehouse": {
+        const input = parseToolInput(name, rawInput);
+        return this.boundedSuccess(
+          "Fabric Warehouse retrieved.",
+          await this.fabricData.getWarehouse(input.workspaceId, input.warehouseId),
+          this.options.maxDataResponseBytes,
+        );
+      }
+      case "inspect_data_source_schema": {
+        const input = parseToolInput(name, rawInput);
+        return this.boundedSuccess(
+          "Fabric data-source schema inspected.",
+          await this.fabricData.inspectSchema({
+            workspaceId: input.workspaceId,
+            itemType: input.itemType,
+            itemId: input.itemId,
+            ...(input.schemaName === undefined ? {} : { schemaName: input.schemaName }),
+            ...(input.tableName === undefined ? {} : { tableName: input.tableName }),
+            maxColumns: input.maxColumns,
+          }),
+          this.options.maxDataResponseBytes,
+        );
+      }
+      case "sample_data_source_table": {
+        const input = parseToolInput(name, rawInput);
+        return this.boundedSuccess(
+          "Fabric table sample retrieved.",
+          await this.fabricData.sampleTable({
+            workspaceId: input.workspaceId,
+            itemType: input.itemType,
+            itemId: input.itemId,
+            schemaName: input.schemaName,
+            tableName: input.tableName,
+            ...(input.columns === undefined ? {} : { columns: input.columns }),
+            maxRows: input.maxRows,
+          }),
+          this.options.maxDataResponseBytes,
         );
       }
       case "get_semantic_model": {
@@ -783,10 +876,14 @@ export class McpWorkflowService implements McpToolHandler {
     );
   }
 
-  private boundedSuccess(message: string, value: unknown): ToolExecution {
+  private boundedSuccess(
+    message: string,
+    value: unknown,
+    maxBytes = this.options.maxResponseBytes,
+  ): ToolExecution {
     const data = toJsonRecord(value);
     const bytes = Buffer.byteLength(JSON.stringify(data), "utf8");
-    if (bytes > this.options.maxResponseBytes) {
+    if (bytes > maxBytes) {
       throw new DomainError(
         "TOOL_OUTPUT_TOO_LARGE",
         "The requested output exceeds the configured response limit. Request a bounded summary or fewer objects.",

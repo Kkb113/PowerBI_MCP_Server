@@ -22,10 +22,3 @@ export class DomainError extends Error {
     };
   }
 }
-
-export function notImplemented(toolName: string): DomainError {
-  return new DomainError(
-    "NOT_IMPLEMENTED",
-    `The ${toolName} tool is part of the frozen Phase 1 contract but has no Fabric implementation yet.`,
-  );
-}

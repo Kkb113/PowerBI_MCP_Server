@@ -9,6 +9,8 @@ const WORKSPACE_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const OTHER_WORKSPACE_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const MODEL_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const OPERATION_ID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+const LAKEHOUSE_ID = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+const WAREHOUSE_ID = "ffffffff-ffff-4fff-8fff-ffffffffffff";
 
 const workspace = (id = WORKSPACE_ID) => ({
   id,
@@ -50,7 +52,7 @@ const requestBody = (init: RequestInit | undefined): string =>
 
 const createFabricClient = (
   fetchImplementation: typeof fetch,
-  options: { allowed?: readonly string[]; readOnly?: boolean; maxPages?: number } = {},
+  options: { readOnly?: boolean; maxPages?: number } = {},
 ): FabricClient => {
   const tokenProvider: AccessTokenProvider = {
     getAccessToken: () => Promise.resolve("fabric-token"),
@@ -71,7 +73,6 @@ const createFabricClient = (
       fetch: fetchImplementation,
     }),
     {
-      allowedWorkspaceIds: options.allowed ?? [WORKSPACE_ID],
       readOnly: options.readOnly ?? true,
       maxPages: options.maxPages ?? 10,
     },
@@ -79,15 +80,7 @@ const createFabricClient = (
 };
 
 describe("FabricClient read operations", () => {
-  it("returns no workspaces without an allowlist and makes no external request", async () => {
-    const fetchMock = vi.fn<typeof fetch>();
-    const client = createFabricClient(fetchMock, { allowed: [] });
-
-    await expect(client.listWorkspaces()).resolves.toEqual([]);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("paginates workspace discovery and only returns allowlisted workspaces", async () => {
+  it("paginates every workspace visible to the configured Entra identity", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(
@@ -100,7 +93,10 @@ describe("FabricClient read operations", () => {
       .mockResolvedValueOnce(jsonResponse(200, { value: [workspace()] }));
     const client = createFabricClient(fetchMock);
 
-    await expect(client.listWorkspaces()).resolves.toEqual([workspace()]);
+    await expect(client.listWorkspaces()).resolves.toEqual([
+      workspace(OTHER_WORKSPACE_ID),
+      workspace(),
+    ]);
     expect(inputUrl(fetchMock.mock.calls[1]?.[0])).toContain("continuationToken=next+token");
   });
 
@@ -236,6 +232,62 @@ describe("FabricClient read operations", () => {
     });
     expect(inputUrl(fetchMock.mock.calls[0]?.[0])).toContain(`/v1/connections/${OPERATION_ID}`);
   });
+
+  it("discovers Lakehouses, their Delta tables, and Warehouses", async () => {
+    const lakehouse = {
+      id: LAKEHOUSE_ID,
+      displayName: "Sales Lakehouse",
+      type: "Lakehouse",
+      workspaceId: WORKSPACE_ID,
+      properties: {
+        oneLakeTablesPath: "https://onelake.dfs.fabric.microsoft.com/ws/lh/Tables",
+        oneLakeFilesPath: "https://onelake.dfs.fabric.microsoft.com/ws/lh/Files",
+        sqlEndpointProperties: {
+          connectionString: "abc.datawarehouse.fabric.microsoft.com",
+          id: OPERATION_ID,
+          provisioningStatus: "Success",
+        },
+      },
+    };
+    const table = {
+      name: "Sales",
+      type: "Managed",
+      format: "delta",
+      location: "abfss://workspace@onelake.dfs.fabric.microsoft.com/item/Tables/Sales",
+    };
+    const warehouse = {
+      id: WAREHOUSE_ID,
+      displayName: "Sales Warehouse",
+      type: "Warehouse",
+      workspaceId: WORKSPACE_ID,
+      properties: {
+        connectionString: "xyz.datawarehouse.fabric.microsoft.com",
+        collationType: "Latin1_General_100_CI_AS_KS_WS_SC_UTF8",
+      },
+    };
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse(200, { value: [lakehouse] }))
+      .mockResolvedValueOnce(jsonResponse(200, lakehouse))
+      .mockResolvedValueOnce(
+        jsonResponse(200, { data: [table], continuationToken: null, continuationUri: null }),
+      )
+      .mockResolvedValueOnce(jsonResponse(200, { value: [warehouse] }))
+      .mockResolvedValueOnce(jsonResponse(200, warehouse));
+    const client = createFabricClient(fetchMock);
+
+    await expect(client.listLakehouses(WORKSPACE_ID)).resolves.toEqual([lakehouse]);
+    await expect(client.getLakehouse(WORKSPACE_ID, LAKEHOUSE_ID)).resolves.toEqual(lakehouse);
+    await expect(client.listLakehouseTables(WORKSPACE_ID, LAKEHOUSE_ID)).resolves.toEqual([table]);
+    await expect(client.listWarehouses(WORKSPACE_ID)).resolves.toEqual([warehouse]);
+    await expect(client.getWarehouse(WORKSPACE_ID, WAREHOUSE_ID)).resolves.toEqual(warehouse);
+
+    const urls = fetchMock.mock.calls.map((call) => inputUrl(call[0]));
+    expect(urls[0]).toContain(`/workspaces/${WORKSPACE_ID}/lakehouses`);
+    expect(urls[2]).toContain(`/lakehouses/${LAKEHOUSE_ID}/tables`);
+    expect(urls[2]).toContain("maxResults=100");
+    expect(urls[3]).toContain(`/workspaces/${WORKSPACE_ID}/warehouses`);
+  });
 });
 
 describe("FabricClient mutation boundary", () => {
@@ -344,16 +396,12 @@ describe("FabricClient mutation boundary", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("rejects invalid IDs, unapproved workspaces, bad inputs, and incomplete 202 responses", async () => {
+  it("rejects invalid IDs, bad inputs, and incomplete 202 responses", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(202));
     const client = createFabricClient(fetchMock, { readOnly: false });
 
     await expect(client.getSemanticModel("not-a-uuid", MODEL_ID)).rejects.toMatchObject({
       code: "INVALID_IDENTIFIER",
-    });
-    await expect(client.getSemanticModel(OTHER_WORKSPACE_ID, MODEL_ID)).rejects.toMatchObject({
-      code: "WORKSPACE_NOT_ALLOWED",
-      httpStatus: 403,
     });
     await expect(client.getSemanticModel(WORKSPACE_ID, "invalid")).rejects.toMatchObject({
       code: "INVALID_IDENTIFIER",

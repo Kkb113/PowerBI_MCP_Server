@@ -1,4 +1,4 @@
-export type ExternalService = "azure-identity" | "fabric" | "powerbi";
+export type ExternalService = "azure-identity" | "fabric" | "fabric-sql" | "powerbi";
 
 export interface ApiErrorOptions {
   readonly service: ExternalService;
@@ -63,16 +63,4 @@ export function assertWritable(
       operation,
     });
   }
-}
-
-export function workspaceNotAllowed(
-  workspaceId: string,
-  operation: string,
-  service: ExternalService = "fabric",
-): ApiError {
-  return new ApiError(
-    "WORKSPACE_NOT_ALLOWED",
-    `Workspace ${workspaceId} is not in the configured allowlist.`,
-    { service, operation, httpStatus: 403 },
-  );
 }

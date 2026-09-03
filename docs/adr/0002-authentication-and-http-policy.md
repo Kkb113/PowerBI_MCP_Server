@@ -2,7 +2,6 @@
 
 - Status: Accepted
 - Date: 2026-09-02
-- Applies from: Phase 2
 
 ## Context
 
@@ -25,9 +24,9 @@ POST requests such as DAX execution and definition retrieval. Create, update, de
 refresh requests are never retried automatically. `Retry-After` is honored for safe throttled
 requests, with a bounded delay.
 
-Every domain-client call validates the workspace allowlist before network access. Mutations also
-pass a read-only policy guard. The default configuration has an empty allowlist and read-only mode
-enabled.
+Workspace identifiers are validated locally, while Entra roles and Fabric item permissions remain
+the authorization boundary. Mutations also pass a read-only policy guard, which remains enabled by
+default.
 
 ## Consequences
 

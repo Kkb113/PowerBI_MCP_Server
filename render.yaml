@@ -30,6 +30,10 @@ services:
         value: "1000"
       - key: DAX_MAX_RESPONSE_BYTES
         value: "1048576"
+      - key: DATA_MAX_ROWS
+        value: "100"
+      - key: DATA_MAX_RESPONSE_BYTES
+        value: "1048576"
       - key: MCP_API_KEY
         sync: false
       - key: AZURE_TENANT_ID
@@ -37,6 +41,4 @@ services:
       - key: AZURE_CLIENT_ID
         sync: false
       - key: AZURE_CLIENT_SECRET
-        sync: false
-      - key: FABRIC_ALLOWED_WORKSPACE_IDS
         sync: false

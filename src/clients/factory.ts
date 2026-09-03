@@ -2,12 +2,14 @@ import type { TokenCredential } from "@azure/core-auth";
 import type { AppConfig } from "../config.js";
 import { CachedAccessTokenProvider, createAzureCredential } from "../identity.js";
 import type { Logger } from "../logging.js";
+import { FabricSqlClient } from "./fabric-sql-client.js";
 import { FabricClient, FABRIC_API_BASE_URL } from "./fabric-client.js";
 import { ResilientHttpClient } from "./http-client.js";
 import { PowerBiClient, POWERBI_API_BASE_URL } from "./powerbi-client.js";
 
 export interface MicrosoftApiClients {
   readonly fabric: FabricClient;
+  readonly fabricSql: FabricSqlClient;
   readonly powerBi: PowerBiClient;
 }
 
@@ -30,12 +32,15 @@ export function createMicrosoftApiClients(
 
   return {
     fabric: new FabricClient(http, {
-      allowedWorkspaceIds: config.allowedWorkspaceIds,
       readOnly: config.readOnly,
       maxPages: config.http.maxPages,
     }),
+    fabricSql: new FabricSqlClient(tokenProvider, {
+      timeoutMs: config.http.timeoutMs,
+      maxRows: config.data.maxRows,
+      maxResponseBytes: config.data.maxResponseBytes,
+    }),
     powerBi: new PowerBiClient(http, {
-      allowedWorkspaceIds: config.allowedWorkspaceIds,
       readOnly: config.readOnly,
     }),
   };

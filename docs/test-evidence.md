@@ -1,86 +1,110 @@
-# Release-candidate test evidence
+# Production verification evidence
 
-## Candidate
+## Release
 
-- Version: `0.1.0-rc.1`
+- Version: `1.0.0`
 - Verification date: 2026-09-03
-- Runtime: Node.js 24.14.0
-- Release deployment: not performed; Phase 6 prepares the candidate for Render testing
+- Runtime: Node.js `24.14.0`
+- MCP contract: 25 tools and two read-only resources
+- Deployment targets: Render and Azure Container Apps
 
-## Tenant-independent gates
+## Required quality gates
 
-The required local command is `npm run check`. It covers formatting, lint rules, strict TypeScript
-types, unit tests, MCP contract tests, mocked Microsoft HTTP integration tests, real MCP-client
-end-to-end tests, coverage thresholds, and the production TypeScript build.
+`npm run check` is the mandatory source-quality gate. It verifies formatting, lint rules, strict
+TypeScript compilation, unit tests, contract tests, mocked Microsoft API integration tests, real
+MCP-client end-to-end tests, coverage thresholds, and the production build.
 
-| Risk or behavior                      | Automated evidence                                                                     |
-| ------------------------------------- | -------------------------------------------------------------------------------------- |
-| Timeout and abort                     | `tests/integration/http-client.test.ts`                                                |
-| Safe retry and API throttling         | `tests/integration/http-client.test.ts`, `tests/integration/fabric-client.test.ts`     |
-| Fabric 202 operation resumption       | `tests/unit/semantic-model-service.test.ts`, `tests/unit/mcp-workflow-service.test.ts` |
-| Malformed MCP/HTTP input              | `tests/integration/http.test.ts`, `tests/e2e/mcp.test.ts`                              |
-| Missing or invalid bearer credential  | `tests/integration/http.test.ts`                                                       |
-| Host and Origin rejection             | `tests/integration/http.test.ts`                                                       |
-| Workspace allowlist                   | Fabric/Power BI client integration tests                                               |
-| Concurrent semantic hash conflict     | model-engine, lifecycle-service, and live Phase 6 tests                                |
-| Fabric and Power BI failure responses | client integration and workflow unit tests                                             |
-| Read-only enforcement                 | `tests/unit/mcp-workflow-service.test.ts` and lifecycle/client tests                   |
-| Secret and response redaction         | logging, MCP server, and real MCP-client tests                                         |
-| Bounded DAX rows and response bytes   | `tests/unit/mcp-workflow-service.test.ts`                                              |
-| Permanent-delete confirmation         | lifecycle-service, contract, and end-to-end tests                                      |
+| Risk or behavior                                                 | Automated evidence                                                   |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Authentication and request-boundary validation                   | `tests/integration/http.test.ts`, `tests/integration/server.test.ts` |
+| Host and browser-origin enforcement                              | `tests/integration/http.test.ts`, `tests/unit/config.test.ts`        |
+| Secret and response redaction                                    | `tests/unit/logging.test.ts`, `tests/e2e/mcp.test.ts`                |
+| Entra token audience separation and caching                      | `tests/unit/identity.test.ts`, `tests/e2e/microsoft-clients.test.ts` |
+| Timeout, response limit, retry, and throttling policy            | `tests/integration/http-client.test.ts`                              |
+| Typed Fabric and Power BI request/response handling              | client integration and MCP workflow tests                            |
+| Entra/Fabric workspace authorization boundary                    | Fabric/Power BI client, configuration, and workflow tests            |
+| Deterministic model encoding and validation                      | model unit tests and `tests/e2e/model-engine.test.ts`                |
+| Atomic object CRUD and dependency conflicts                      | model engine and lifecycle-service tests                             |
+| Definition hash concurrency protection                           | lifecycle-service and semantic-model end-to-end tests                |
+| Preview-first writes and central read-only enforcement           | workflow, lifecycle, and client tests                                |
+| Permanent-delete confirmation                                    | contract, lifecycle-service, and semantic-model end-to-end tests     |
+| DAX row/response bounds and stable errors                        | workflow and Power BI client tests                                   |
+| Refresh and long-running-operation resumption                    | lifecycle, workflow, and client tests                                |
+| Lakehouse/Warehouse discovery and response parsing               | Fabric client, data-service, and MCP end-to-end tests                |
+| Fabric SQL host restriction, token scope, and query construction | `tests/integration/fabric-sql-client.test.ts`                        |
+| Bounded source schema and table reads                            | Fabric SQL client, data-service, and workflow tests                  |
 
-The separate `npm run test:container` release gate builds and starts the production image. It
-checks exact Node version, a non-root UID, no development-only dependencies, read-only filesystem
-compatibility, no Linux capabilities, `/health`, `/ready`, bearer rejection, authenticated MCP
-discovery, restart recovery, secret-free logs, and a zero-exit SIGTERM shutdown.
+`npm run test:container` is the mandatory image gate. It builds the production Dockerfile and
+verifies the pinned Node.js version, production-only dependencies, non-root execution, read-only
+filesystem compatibility, dropped Linux capabilities, health/readiness probes, bearer rejection,
+authenticated MCP discovery, restart recovery, secret-free logs, and graceful SIGTERM shutdown.
 
-## Live Fabric gates
+## Verified results
 
-The opt-in command `npm run test:live:phase6` refuses to run unless write mode, live mutation, live
-permanent deletion, and exactly one allowlisted development workspace are explicit. It executes
-the following complete workflow twice through an actual MCP HTTP client:
+The production `1.0.0` tree passed the following checks on 2026-09-03:
 
-1. Initialize MCP and verify the 18-tool contract.
-2. List workspaces and confirm the allowlisted development workspace is visible.
-3. Preview and create a uniquely named, self-contained import semantic model.
-4. List and get the created item; update and read back its name and description.
-5. Read its definition and deterministic snapshot hash.
-6. Create, update, and delete a representative DAX measure and hierarchy.
-7. Submit a stale hash and verify `STALE_DEFINITION_HASH` without mutation.
-8. Verify the delete batch restores the original definition hash.
-9. Read bounded model information, compare the deployed model, and pass every pre-deploy check.
-10. Preview a full refresh, start it, poll to a successful terminal state, and retain no local
-    operation state.
-11. Validate correct DAX, reject invalid DAX, and execute a one-row bounded DAX query.
-12. Permanently delete the exact disposable model with repeated ID, exact current name, and strong
-    confirmation; list models and verify it is absent.
+- `npm run check`: 23 test files and 191 tests passed; line coverage was 94.57%; the production
+  TypeScript build completed successfully.
+- `npm run test:container`: Node.js `v24.14.0`, UID `1000`, 25 tools, two resources, restart, and
+  graceful shutdown checks passed; the production dependency audit reported no vulnerabilities.
+- `npm run test:live:data`: the configured service principal discovered three authorized
+  workspaces, 27 Lakehouses, and two Warehouses; listed nine Lakehouse tables; inspected 25 SQL
+  endpoint columns; and completed a bounded one-column, one-row sample without exposing IDs,
+  secrets, SQL text, or row values in the result.
+- `npm run test:live`: the configured service principal discovered three authorized workspaces and
+  30 semantic models using enforced read-only mode and aggregate-only output.
 
-The test model uses an inline `#table` M partition, so connection binding is not applicable. Binding
-serialization, preview/apply behavior, allowlisting, failure mapping, and read-only enforcement are
-covered by tenant-independent tests.
+## Environment-dependent mutation status
 
-## Recorded result
+The guarded `npm run test:live:full` check was attempted twice on 2026-09-03. Fabric rejected the
+initial semantic-model create operation both times with
+`PersonalGateway_ShortMessage_PublishingError` and marked the service response as non-permanent.
+The failure occurred in the Microsoft dataset workload after the local preview and before any model
+ID was returned. Aggregate read-only checks before and after the attempts both reported 30 semantic
+models, confirming that neither attempt left a disposable artifact.
 
-Results from the release-candidate tree on 2026-09-03:
+The source, MCP, and production-container end-to-end gates remain successful. A fresh live mutation
+acceptance run is still required after the Fabric tenant/workload publishing condition is resolved;
+do not represent the environment-dependent write gate as passed until that command completes and
+verifies cleanup.
 
-- `npm run check`: passed; 21 test files and 182 tests passed, 94.72% line coverage, production
-  build passed
-- `npm run test:container`: passed; Node `v24.14.0`, UID `1000`, 18 tools, two resources, restart
-  and graceful shutdown verified
-- Phase 6 live run 1: passed every operation above; permanent delete verified
-- Phase 6 live run 2: passed every operation above from a new model; permanent delete verified
-- Post-delete active artifacts: none from either completed run
-- Official MCP Inspector strict `tools/list`: passed with 18 tools and no portability error
-- GitHub Actions quality gate: passed in 43 seconds in
-  [CI run 33702784497](https://github.com/Kkb113/PowerBI_MCP_Server/actions/runs/33702784497)
-- GitHub Actions production container gate: passed in 38 seconds in the same clean-checkout CI run
+## Live mutation verification contract
 
-The pre-candidate runs found and resolved two verifier issues and one product boundary defect: Docker
-Desktop can reassign an automatically published host port after restart, a complete Fabric
-update-and-readback can exceed the MCP client's default request timeout, and `list_semantic_models`
-was forwarding `workspaceId` into a pagination-only parser. The final container and live runs used
-the corrected code. Every preliminary disposable model was also permanently deleted during
-`finally` cleanup.
+`npm run test:live:full` performs two complete sequential lifecycles through a real MCP HTTP client.
+It is opt-in and refuses to start unless all of the following are explicitly configured:
 
-No critical-path test may be silently skipped. A failed cleanup leaves the candidate blocked and the
-created model ID must be resolved before any release tag is created.
+- `FABRIC_TEST_WORKSPACE_ID` identifies one approved non-production workspace.
+- `POWERBI_MCP_READONLY=false` enables applied mutations.
+- `LIVE_FULL_MUTATION=true` acknowledges model creation and update.
+- `LIVE_FULL_PERMANENT_DELETE=true` acknowledges irreversible cleanup.
+
+Each run performs the following operations:
+
+1. Initialize MCP and verify the published 25-tool contract.
+2. Confirm the configured non-production workspace is visible to the service principal.
+3. Preview and create a uniquely named, self-contained semantic model.
+4. Read and update item properties and verify the definition and semantic hash.
+5. Create, update, and delete representative DAX measure and hierarchy objects.
+6. Reject a stale definition hash without mutation and verify hash restoration after object cleanup.
+7. Generate a snapshot and diff and pass the deployment validation gate.
+8. Preview and start a full refresh and poll it to a successful terminal state.
+9. Validate correct DAX, reject invalid DAX, and execute a bounded one-row DAX query.
+10. Permanently delete the exact disposable model using repeated ID, exact name, explicit
+    confirmation, and post-delete absence verification.
+
+Cleanup runs in `finally` with a direct Fabric fallback when the MCP connection is unavailable. A
+failed cleanup fails the verification and must be resolved before deployment.
+
+## Production acceptance
+
+Deployment acceptance requires all of the following:
+
+- `/health` and `/ready` return HTTP 200 and reveal only service status.
+- `/mcp` returns HTTP 401 without the bearer secret and initializes with the correct secret.
+- The server publishes exactly 25 tools and two read-only resources.
+- Workspace discovery is limited to the Entra identity's Fabric permissions.
+- Read-only mode blocks every applied create, update, delete, bind, and refresh workflow.
+- A process restart requires no local state recovery.
+- Logs contain no configured secrets, model definitions, DAX rows, or sampled table values.
+- Lakehouse/Warehouse metadata and bounded sampling succeed when SQL permissions are present.
+- Any approved disposable lifecycle completes and permanently removes its created model.

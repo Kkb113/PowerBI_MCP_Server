@@ -13,7 +13,6 @@ const environmentSchema = z.object({
   AZURE_TENANT_ID: z.uuid().optional(),
   AZURE_CLIENT_ID: z.uuid().optional(),
   AZURE_CLIENT_SECRET: z.string().min(1).optional(),
-  FABRIC_ALLOWED_WORKSPACE_IDS: z.string().optional(),
   POWERBI_MCP_READONLY: z
     .enum(["true", "false"])
     .transform((value) => value === "true")
@@ -25,6 +24,8 @@ const environmentSchema = z.object({
   LRO_POLL_BUDGET_MS: z.coerce.number().int().min(0).max(600_000).default(60_000),
   DAX_MAX_ROWS: z.coerce.number().int().min(1).max(10_000).default(1_000),
   DAX_MAX_RESPONSE_BYTES: z.coerce.number().int().min(1_024).max(10_485_760).default(1_048_576),
+  DATA_MAX_ROWS: z.coerce.number().int().min(1).max(1_000).default(100),
+  DATA_MAX_RESPONSE_BYTES: z.coerce.number().int().min(1_024).max(10_485_760).default(1_048_576),
 });
 
 export type LogLevel = z.infer<typeof environmentSchema>["LOG_LEVEL"];
@@ -43,7 +44,6 @@ export interface AppConfig {
     readonly clientId?: string;
     readonly clientSecret?: string;
   };
-  readonly allowedWorkspaceIds: readonly string[];
   readonly readOnly: boolean;
   readonly http: {
     readonly timeoutMs: number;
@@ -53,6 +53,10 @@ export interface AppConfig {
   };
   readonly lroPollBudgetMs: number;
   readonly dax: {
+    readonly maxRows: number;
+    readonly maxResponseBytes: number;
+  };
+  readonly data: {
     readonly maxRows: number;
     readonly maxResponseBytes: number;
   };
@@ -111,16 +115,6 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     ]);
   }
 
-  const allowedWorkspaceIds = splitCommaSeparated(parsed.data.FABRIC_ALLOWED_WORKSPACE_IDS);
-  const invalidWorkspaceIds = allowedWorkspaceIds.filter(
-    (workspaceId) => !z.uuid().safeParse(workspaceId).success,
-  );
-  if (invalidWorkspaceIds.length > 0) {
-    throw new ConfigurationError([
-      `FABRIC_ALLOWED_WORKSPACE_IDS contains ${invalidWorkspaceIds.length} invalid UUID value(s).`,
-    ]);
-  }
-
   const azure = Object.freeze({
     mode: usesClientSecret ? ("client-secret" as const) : ("default" as const),
     ...(parsed.data.AZURE_TENANT_ID ? { tenantId: parsed.data.AZURE_TENANT_ID } : {}),
@@ -139,7 +133,6 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     ),
     logLevel: parsed.data.LOG_LEVEL,
     azure,
-    allowedWorkspaceIds: Object.freeze(unique(allowedWorkspaceIds.map((id) => id.toLowerCase()))),
     readOnly: parsed.data.POWERBI_MCP_READONLY,
     http: Object.freeze({
       timeoutMs: parsed.data.HTTP_TIMEOUT_MS,
@@ -151,6 +144,10 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     dax: Object.freeze({
       maxRows: parsed.data.DAX_MAX_ROWS,
       maxResponseBytes: parsed.data.DAX_MAX_RESPONSE_BYTES,
+    }),
+    data: Object.freeze({
+      maxRows: parsed.data.DATA_MAX_ROWS,
+      maxResponseBytes: parsed.data.DATA_MAX_RESPONSE_BYTES,
     }),
   });
 }

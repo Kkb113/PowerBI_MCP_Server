@@ -7,9 +7,8 @@
 
 Fabric's update-definition operation replaces a semantic-model definition. A model mutation must
 therefore preserve every supported object, detect stale state through a stable hash, and fail before
-submission when one operation would leave the model invalid. The Python reference supplies useful
-DAX lint, identifier quoting, dependency-analysis, and atomic-edit behavior, but its Desktop/TOM and
-TMDL implementation cannot be used directly by this cloud-only TypeScript service.
+submission when one operation would leave the model invalid. The cloud-only TypeScript service
+therefore requires native DAX linting, identifier quoting, dependency analysis, and atomic editing.
 
 Fabric documents `model.bim` and `definition.pbism` as the required parts for a TMSL semantic-model
 definition. TMSL replacement semantics also mean that omitted child collections are deleted. This
@@ -17,7 +16,7 @@ makes silent acceptance and removal of unknown fields unsafe.
 
 ## Decision
 
-Phase 3 introduces one strict `ModelSpec`, a loss-aware TMSL codec, and one atomic transaction engine.
+The service uses one strict `ModelSpec`, a loss-aware TMSL codec, and one atomic transaction engine.
 All changes are applied to an isolated normalized copy. The copy is semantically validated after the
 entire batch, then returned with before/after SHA-256 hashes and a semantic diff. The caller's model
 is never mutated, including when a duplicate, missing parent, dependency conflict, invalid reference,
@@ -47,8 +46,7 @@ catalog is deliberately partial because Microsoft adds built-in functions and su
 functions. `DL008` therefore means only that a call is absent from the local catalog; it is always
 informational and non-blocking. Static reference extraction validates common table, column, measure,
 calculation-group, and RLS references and enables dependency reporting, but it is not presented as a
-complete DAX compiler. Executable DAX validation against Fabric remains authoritative and belongs to
-a later phase.
+complete DAX compiler. Executable DAX validation against Fabric remains authoritative.
 
 ## Consequences
 
@@ -56,8 +54,9 @@ a later phase.
 - Unsupported definitions fail closed rather than suffering a lossy full-definition rewrite.
 - Existing tenant models containing unsupported objects such as perspectives, cultures, functions,
   or translations are not yet eligible for mutation.
-- Phase 4 can compose fetch, hash check, preview, apply, read-back, and verification around one engine.
-- Phase 3 performs no live Fabric writes and leaves every MCP handler unchanged.
+- Lifecycle orchestration composes fetch, hash check, preview, apply, read-back, and verification
+  around one engine.
+- The model engine itself performs no live Fabric writes.
 
 ## References
 
@@ -65,4 +64,3 @@ a later phase.
 - [TMSL reference](https://learn.microsoft.com/en-us/analysis-services/tmsl/tabular-model-scripting-language-tmsl-reference)
 - [TMSL model replacement semantics](https://learn.microsoft.com/en-us/analysis-services/tmsl/model-object-tmsl)
 - [TMSL relationship object](https://learn.microsoft.com/en-us/analysis-services/tmsl/relationships-object-tmsl)
-- [Python reference agent guidance](../../powerbi-mcp/AGENTS.md)

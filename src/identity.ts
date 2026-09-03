@@ -5,8 +5,9 @@ import { ApiError, type ExternalService } from "./clients/errors.js";
 
 export const FABRIC_SCOPE = "https://api.fabric.microsoft.com/.default";
 export const POWERBI_SCOPE = "https://analysis.windows.net/powerbi/api/.default";
+export const FABRIC_SQL_SCOPE = "https://database.windows.net/.default";
 
-export type TokenAudience = "fabric" | "powerbi";
+export type TokenAudience = "fabric" | "fabric-sql" | "powerbi";
 
 export interface AccessTokenProvider {
   getAccessToken(audience: TokenAudience): Promise<string>;
@@ -19,11 +20,13 @@ export interface AccessTokenProviderOptions {
 
 const audienceScope: Readonly<Record<TokenAudience, string>> = {
   fabric: FABRIC_SCOPE,
+  "fabric-sql": FABRIC_SQL_SCOPE,
   powerbi: POWERBI_SCOPE,
 };
 
 const audienceService: Readonly<Record<TokenAudience, ExternalService>> = {
   fabric: "fabric",
+  "fabric-sql": "fabric-sql",
   powerbi: "powerbi",
 };
 

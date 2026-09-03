@@ -5,7 +5,6 @@ import type { AccessTokenProvider } from "../../src/identity.js";
 import type { Logger } from "../../src/logging.js";
 
 const WORKSPACE_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-const OTHER_WORKSPACE_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const MODEL_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const REFRESH_ID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 
@@ -31,7 +30,7 @@ const requestBody = (init: RequestInit | undefined): string =>
 
 const createPowerBiClient = (
   fetchImplementation: typeof fetch,
-  options: { allowed?: readonly string[]; readOnly?: boolean } = {},
+  options: { readOnly?: boolean } = {},
 ): PowerBiClient => {
   const tokenProvider: AccessTokenProvider = {
     getAccessToken: () => Promise.resolve("powerbi-token"),
@@ -52,7 +51,6 @@ const createPowerBiClient = (
       fetch: fetchImplementation,
     }),
     {
-      allowedWorkspaceIds: options.allowed ?? [WORKSPACE_ID],
       readOnly: options.readOnly ?? true,
     },
   );
@@ -155,9 +153,6 @@ describe("PowerBiClient", () => {
     const fetchMock = vi.fn<typeof fetch>();
     const writableClient = createPowerBiClient(fetchMock, { readOnly: false });
 
-    await expect(
-      writableClient.executeDax(OTHER_WORKSPACE_ID, MODEL_ID, { query: "EVALUATE ROW()" }),
-    ).rejects.toMatchObject({ code: "WORKSPACE_NOT_ALLOWED" });
     await expect(
       writableClient.executeDax("bad", MODEL_ID, { query: "EVALUATE ROW()" }),
     ).rejects.toMatchObject({ code: "INVALID_IDENTIFIER" });

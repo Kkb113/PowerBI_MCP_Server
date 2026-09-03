@@ -16,7 +16,6 @@ export const TEST_CONFIG: AppConfig = Object.freeze({
   allowedOrigins: Object.freeze(["127.0.0.1", "localhost"]),
   logLevel: "error",
   azure: Object.freeze({ mode: "default" }),
-  allowedWorkspaceIds: Object.freeze([]),
   readOnly: true,
   http: Object.freeze({
     timeoutMs: 1_000,
@@ -26,6 +25,7 @@ export const TEST_CONFIG: AppConfig = Object.freeze({
   }),
   lroPollBudgetMs: 1_000,
   dax: Object.freeze({ maxRows: 100, maxResponseBytes: 65_536 }),
+  data: Object.freeze({ maxRows: 25, maxResponseBytes: 65_536 }),
 });
 
 export interface TestHttpServer {

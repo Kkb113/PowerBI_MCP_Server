@@ -17,7 +17,6 @@ describe("loadConfig", () => {
     expect(config.allowedOrigins).toEqual(config.allowedHosts);
     expect(config.apiKey).toBe(apiKey);
     expect(config.azure).toEqual({ mode: "default" });
-    expect(config.allowedWorkspaceIds).toEqual([]);
     expect(config.readOnly).toBe(true);
     expect(config.http).toEqual({
       timeoutMs: 30_000,
@@ -27,18 +26,17 @@ describe("loadConfig", () => {
     });
     expect(config.lroPollBudgetMs).toBe(60_000);
     expect(config.dax).toEqual({ maxRows: 1_000, maxResponseBytes: 1_048_576 });
+    expect(config.data).toEqual({ maxRows: 100, maxResponseBytes: 1_048_576 });
     expect(Object.isFrozen(config)).toBe(true);
   });
 
-  it("loads client-secret authentication, allowlists, and HTTP controls", () => {
+  it("loads client-secret authentication and bounded HTTP and data controls", () => {
     const config = loadConfig({
       MCP_API_KEY: apiKey,
       AZURE_AUTH_MODE: "client-secret",
       AZURE_TENANT_ID: "11111111-1111-4111-8111-111111111111",
       AZURE_CLIENT_ID: "22222222-2222-4222-8222-222222222222",
       AZURE_CLIENT_SECRET: "credential",
-      FABRIC_ALLOWED_WORKSPACE_IDS:
-        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa,AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA",
       POWERBI_MCP_READONLY: "false",
       HTTP_TIMEOUT_MS: "5000",
       HTTP_MAX_RETRIES: "3",
@@ -47,6 +45,8 @@ describe("loadConfig", () => {
       LRO_POLL_BUDGET_MS: "45000",
       DAX_MAX_ROWS: "250",
       DAX_MAX_RESPONSE_BYTES: "4096",
+      DATA_MAX_ROWS: "50",
+      DATA_MAX_RESPONSE_BYTES: "8192",
     });
 
     expect(config.azure).toEqual({
@@ -55,7 +55,6 @@ describe("loadConfig", () => {
       clientId: "22222222-2222-4222-8222-222222222222",
       clientSecret: "credential",
     });
-    expect(config.allowedWorkspaceIds).toEqual(["aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"]);
     expect(config.readOnly).toBe(false);
     expect(config.http).toEqual({
       timeoutMs: 5_000,
@@ -65,9 +64,10 @@ describe("loadConfig", () => {
     });
     expect(config.lroPollBudgetMs).toBe(45_000);
     expect(config.dax).toEqual({ maxRows: 250, maxResponseBytes: 4_096 });
+    expect(config.data).toEqual({ maxRows: 50, maxResponseBytes: 8_192 });
   });
 
-  it("requires complete client-secret settings and validates workspace IDs", () => {
+  it("requires complete client-secret settings without requiring a workspace ID", () => {
     expect(() =>
       loadConfig({
         MCP_API_KEY: apiKey,
@@ -85,8 +85,14 @@ describe("loadConfig", () => {
       }),
     ).not.toThrow();
     expect(() =>
-      loadConfig({ MCP_API_KEY: apiKey, FABRIC_ALLOWED_WORKSPACE_IDS: "not-a-uuid" }),
-    ).toThrowError(/FABRIC_ALLOWED_WORKSPACE_IDS/);
+      loadConfig({
+        MCP_API_KEY: apiKey,
+        AZURE_AUTH_MODE: "client-secret",
+        AZURE_TENANT_ID: "11111111-1111-4111-8111-111111111111",
+        AZURE_CLIENT_ID: "22222222-2222-4222-8222-222222222222",
+        AZURE_CLIENT_SECRET: "credential",
+      }),
+    ).not.toThrow();
   });
 
   it("adds the Render hostname and removes duplicate allowlist entries", () => {

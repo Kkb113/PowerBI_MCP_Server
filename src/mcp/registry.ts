@@ -53,6 +53,13 @@ const modelInput = workspaceInput.extend({
   semanticModelId: fabricIdSchema,
 });
 
+const dataSourceInput = workspaceInput.extend({
+  itemType: z.enum(["lakehouse", "warehouse"]),
+  itemId: fabricIdSchema,
+});
+
+const sqlIdentifierSchema = z.string().trim().min(1).max(256);
+
 const paginationInput = z.object({
   continuationToken: z.string().min(1).max(8_192).optional(),
   limit: z.number().int().min(1).max(500).default(100),
@@ -82,6 +89,73 @@ export const TOOL_REGISTRY = [
     description: "List semantic models in one permitted Fabric workspace.",
     kind: "read",
     inputSchema: workspaceInput.merge(paginationInput),
+    annotations: readAnnotations,
+  },
+  {
+    name: "list_lakehouses",
+    title: "List Fabric Lakehouses",
+    description: "List Lakehouses visible to the Entra identity in one Fabric workspace.",
+    kind: "read",
+    inputSchema: workspaceInput.merge(paginationInput),
+    annotations: readAnnotations,
+  },
+  {
+    name: "get_lakehouse",
+    title: "Get Fabric Lakehouse",
+    description: "Read Lakehouse properties, OneLake paths, and SQL endpoint status.",
+    kind: "read",
+    inputSchema: workspaceInput.extend({ lakehouseId: fabricIdSchema }),
+    annotations: readAnnotations,
+  },
+  {
+    name: "list_lakehouse_tables",
+    title: "List Lakehouse tables",
+    description: "List Delta tables exposed by the Fabric Lakehouse REST API.",
+    kind: "read",
+    inputSchema: workspaceInput.extend({ lakehouseId: fabricIdSchema }).merge(paginationInput),
+    annotations: readAnnotations,
+  },
+  {
+    name: "list_warehouses",
+    title: "List Fabric Warehouses",
+    description: "List Warehouses visible to the Entra identity in one Fabric workspace.",
+    kind: "read",
+    inputSchema: workspaceInput.merge(paginationInput),
+    annotations: readAnnotations,
+  },
+  {
+    name: "get_warehouse",
+    title: "Get Fabric Warehouse",
+    description: "Read Warehouse properties and its Fabric SQL endpoint hostname.",
+    kind: "read",
+    inputSchema: workspaceInput.extend({ warehouseId: fabricIdSchema }),
+    annotations: readAnnotations,
+  },
+  {
+    name: "inspect_data_source_schema",
+    title: "Inspect Lakehouse or Warehouse schema",
+    description:
+      "Inspect bounded table, view, and column metadata through the Fabric SQL endpoint.",
+    kind: "read",
+    inputSchema: dataSourceInput.extend({
+      schemaName: sqlIdentifierSchema.optional(),
+      tableName: sqlIdentifierSchema.optional(),
+      maxColumns: z.number().int().min(1).max(2_000).default(500),
+    }),
+    annotations: readAnnotations,
+  },
+  {
+    name: "sample_data_source_table",
+    title: "Sample Lakehouse or Warehouse table",
+    description:
+      "Return a bounded read-only sample from one table using server-generated SELECT TOP SQL.",
+    kind: "read",
+    inputSchema: dataSourceInput.extend({
+      schemaName: sqlIdentifierSchema,
+      tableName: sqlIdentifierSchema,
+      columns: z.array(sqlIdentifierSchema).min(1).max(200).optional(),
+      maxRows: z.number().int().min(1).max(1_000).default(25),
+    }),
     annotations: readAnnotations,
   },
   {
@@ -353,9 +427,11 @@ export const RESOURCE_REGISTRY = [
 ] as const satisfies readonly ResourceDefinition[];
 
 export const SERVER_INSTRUCTIONS = [
-  "This server targets Microsoft Fabric cloud semantic models using a canonical TMSL model definition.",
-  "Phase 5 exposes the Fabric lifecycle, bounded JSON DAX execution, refresh tracking, snapshots, diffs, and pre-deployment checks through MCP.",
-  "Treat tool annotations as hints only. Write implementations also enforce preview-by-default, workspace allowlisting, expected-definition hashes, and repeated-ID, exact-name, explicit irreversible confirmation for permanent deletion.",
+  "This server targets Microsoft Fabric cloud semantic models using a canonical TMSL model definition and exposes read-only Lakehouse and Warehouse inspection.",
+  "Fabric exposes lifecycle, bounded JSON DAX execution, refresh tracking, snapshots, diffs, pre-deployment checks, data-item discovery, schema inspection, and bounded table sampling through MCP.",
+  "Workspace access is authorized by the configured Entra identity and Fabric roles; workspace IDs are discovered at runtime and are never configured as a server allowlist.",
+  "Treat tool annotations as hints only. Write implementations also enforce preview-by-default, expected-definition hashes, and repeated-ID, exact-name, explicit irreversible confirmation for permanent deletion.",
+  "Table sampling accepts identifiers only and executes server-generated SELECT TOP statements; arbitrary SQL is not exposed.",
   "The JSON DAX endpoint uses the semantic model culture; it does not support per-request culture overrides.",
   "Never place credentials, access tokens, tenant secrets, or connection secrets in tool arguments.",
 ].join(" ");

@@ -2,18 +2,16 @@
 
 - Status: Accepted
 - Date: 2026-09-02
-- Applies from: Phase 1
 
 ## Context
 
-The server must eventually create, inspect, update, query, refresh, and safely delete Microsoft
-Fabric semantic models from a remote Linux container. The Python reference includes useful model
-analysis and safety behavior, but its Desktop and local authoring paths are not usable in Render or
-Azure Container Apps. Fabric accepts semantic model definitions in TMSL or TMDL formats.
+The server must create, inspect, update, query, refresh, and safely delete Microsoft Fabric semantic
+models from a remote Linux container. Desktop and local authoring paths are not available in Render
+or Azure Container Apps. Fabric accepts semantic-model definitions in TMSL or TMDL formats.
 
 ## Decision
 
-The first release supports Fabric cloud semantic models only. It uses Fabric and Power BI HTTP APIs
+The service supports Fabric cloud semantic models only. It uses Fabric and Power BI HTTP APIs
 and treats the TMSL `model.bim` JSON representation as its canonical definition. It does not add a
 .NET sidecar, XMLA, TOM, ADOMD, Power BI Desktop discovery, PBIX extraction, or a TMDL parser.
 
@@ -26,7 +24,7 @@ require the expected definition hash, and destructive operations will preview by
 - The server can run unchanged as a Linux container on Render and Azure.
 - JSON parsing, validation, stable serialization, hashing, and semantic diffing remain native to
   TypeScript.
-- Phase 1 can fully test the remote MCP boundary without Microsoft credentials or Fabric mutation.
+- The remote MCP boundary can be tested without Microsoft credentials or Fabric mutation.
 - Existing TMDL-authored models are not promised to round-trip losslessly until a live conversion
   test proves that Fabric can return and accept their TMSL representation.
 - Desktop-only and XMLA-only capabilities remain explicitly out of scope unless an HTTP API

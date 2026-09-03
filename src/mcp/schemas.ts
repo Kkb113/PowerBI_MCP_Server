@@ -24,7 +24,7 @@ export const definitionHashSchema = z
 
 export const toolOutputSchema = z.object({
   ok: z.boolean(),
-  status: z.enum(["success", "pending", "failed", "not_implemented"]),
+  status: z.enum(["success", "pending", "failed"]),
   message: z.string(),
   data: z.record(z.string(), jsonValueSchema).nullable(),
   error: z

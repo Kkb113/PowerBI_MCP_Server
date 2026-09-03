@@ -2,20 +2,28 @@ import { z } from "zod";
 import { assertWritable, ApiError } from "./errors.js";
 import type { ApiResponse } from "./http-client.js";
 import type { ResilientHttpClient } from "./http-client.js";
-import { validateUuid, WorkspacePolicy } from "./policy.js";
+import { validateUuid } from "./policy.js";
 import {
   connectionSchema,
+  lakehousePageSchema,
+  lakehouseSchema,
+  lakehouseTablePageSchema,
   operationStateSchema,
   semanticModelDefinitionResponseSchema,
   semanticModelDefinitionSchema,
   semanticModelPageSchema,
   semanticModelSchema,
+  warehousePageSchema,
+  warehouseSchema,
   workspacePageSchema,
   type OperationState,
   type Connection,
+  type Lakehouse,
+  type LakehouseTable,
   type SemanticModel,
   type SemanticModelDefinition,
   type Workspace,
+  type Warehouse,
 } from "./schemas.js";
 
 export const FABRIC_API_BASE_URL = "https://api.fabric.microsoft.com";
@@ -54,7 +62,6 @@ export type UpdateSemanticModelRequest = z.input<typeof updateSemanticModelReque
 export type BindConnectionRequest = z.input<typeof bindConnectionRequestSchema>;
 
 export interface FabricClientOptions {
-  readonly allowedWorkspaceIds: readonly string[];
   readonly readOnly: boolean;
   readonly maxPages: number;
 }
@@ -83,22 +90,14 @@ const invalidInput = (operation: string, error: z.ZodError): ApiError =>
   });
 
 export class FabricClient {
-  private readonly workspacePolicy: WorkspacePolicy;
-
   public constructor(
     private readonly http: ResilientHttpClient,
     private readonly options: FabricClientOptions,
-  ) {
-    this.workspacePolicy = new WorkspacePolicy(options.allowedWorkspaceIds);
-  }
+  ) {}
 
   public async listWorkspaces(): Promise<readonly Workspace[]> {
     const operation = "list_workspaces";
-    if (this.workspacePolicy.size === 0) {
-      return [];
-    }
-
-    const workspaces = new Map<string, Workspace>();
+    const workspaces: Workspace[] = [];
     let continuationToken: string | undefined;
 
     for (let page = 1; page <= this.options.maxPages; page += 1) {
@@ -113,15 +112,11 @@ export class FabricClient {
       });
       const body = this.requireData(response, operation);
 
-      for (const workspace of body.value) {
-        if (this.workspacePolicy.allows(workspace.id)) {
-          workspaces.set(workspace.id.toLowerCase(), workspace);
-        }
-      }
+      workspaces.push(...body.value);
 
       continuationToken = body.continuationToken;
-      if (!continuationToken || workspaces.size === this.workspacePolicy.size) {
-        return [...workspaces.values()];
+      if (!continuationToken) {
+        return workspaces;
       }
     }
 
@@ -130,7 +125,7 @@ export class FabricClient {
 
   public async listSemanticModels(workspaceId: string): Promise<readonly SemanticModel[]> {
     const operation = "list_semantic_models";
-    const allowedWorkspaceId = this.workspacePolicy.assertAllowed(workspaceId, operation, "fabric");
+    const validWorkspaceId = validateUuid(workspaceId, "workspaceId", operation, "fabric");
     const semanticModels: SemanticModel[] = [];
     let continuationToken: string | undefined;
 
@@ -139,7 +134,7 @@ export class FabricClient {
         service: "fabric",
         operation,
         method: "GET",
-        path: `/v1/workspaces/${allowedWorkspaceId}/semanticModels`,
+        path: `/v1/workspaces/${validWorkspaceId}/semanticModels`,
         query: { continuationToken },
         responseSchema: semanticModelPageSchema,
         retryMode: "safe",
@@ -187,19 +182,113 @@ export class FabricClient {
     return this.requireData(response, operation);
   }
 
+  public async listLakehouses(workspaceId: string): Promise<readonly Lakehouse[]> {
+    const operation = "list_lakehouses";
+    const validWorkspaceId = validateUuid(workspaceId, "workspaceId", operation, "fabric");
+    return await this.listWorkspaceCollection(
+      operation,
+      `/v1/workspaces/${validWorkspaceId}/lakehouses`,
+      lakehousePageSchema,
+    );
+  }
+
+  public async getLakehouse(workspaceId: string, lakehouseId: string): Promise<Lakehouse> {
+    const operation = "get_lakehouse";
+    const path = this.workspaceItemPath(
+      workspaceId,
+      lakehouseId,
+      "lakehouseId",
+      "lakehouses",
+      operation,
+    );
+    const response = await this.http.request({
+      service: "fabric",
+      operation,
+      method: "GET",
+      path,
+      responseSchema: lakehouseSchema,
+      retryMode: "safe",
+    });
+    return this.requireData(response, operation);
+  }
+
+  public async listLakehouseTables(
+    workspaceId: string,
+    lakehouseId: string,
+  ): Promise<readonly LakehouseTable[]> {
+    const operation = "list_lakehouse_tables";
+    const path = this.workspaceItemPath(
+      workspaceId,
+      lakehouseId,
+      "lakehouseId",
+      "lakehouses",
+      operation,
+    );
+    const tables: LakehouseTable[] = [];
+    let continuationToken: string | undefined;
+
+    for (let page = 1; page <= this.options.maxPages; page += 1) {
+      const response = await this.http.request({
+        service: "fabric",
+        operation,
+        method: "GET",
+        path: `${path}/tables`,
+        query: { maxResults: 100, continuationToken },
+        responseSchema: lakehouseTablePageSchema,
+        retryMode: "safe",
+      });
+      const body = this.requireData(response, operation);
+      tables.push(...body.data);
+      continuationToken = body.continuationToken ?? undefined;
+      if (!continuationToken) return tables;
+    }
+
+    throw this.paginationLimit(operation);
+  }
+
+  public async listWarehouses(workspaceId: string): Promise<readonly Warehouse[]> {
+    const operation = "list_warehouses";
+    const validWorkspaceId = validateUuid(workspaceId, "workspaceId", operation, "fabric");
+    return await this.listWorkspaceCollection(
+      operation,
+      `/v1/workspaces/${validWorkspaceId}/warehouses`,
+      warehousePageSchema,
+    );
+  }
+
+  public async getWarehouse(workspaceId: string, warehouseId: string): Promise<Warehouse> {
+    const operation = "get_warehouse";
+    const path = this.workspaceItemPath(
+      workspaceId,
+      warehouseId,
+      "warehouseId",
+      "warehouses",
+      operation,
+    );
+    const response = await this.http.request({
+      service: "fabric",
+      operation,
+      method: "GET",
+      path,
+      responseSchema: warehouseSchema,
+      retryMode: "safe",
+    });
+    return this.requireData(response, operation);
+  }
+
   public async createSemanticModel(
     workspaceId: string,
     request: CreateSemanticModelRequest,
   ): Promise<FabricOperation<SemanticModel>> {
     const operation = "create_semantic_model";
-    const allowedWorkspaceId = this.workspacePolicy.assertAllowed(workspaceId, operation, "fabric");
+    const validWorkspaceId = validateUuid(workspaceId, "workspaceId", operation, "fabric");
     assertWritable(this.options.readOnly, operation);
     const body = this.parseInput(createSemanticModelRequestSchema, request, operation);
     const response = await this.http.request({
       service: "fabric",
       operation,
       method: "POST",
-      path: `/v1/workspaces/${allowedWorkspaceId}/semanticModels`,
+      path: `/v1/workspaces/${validWorkspaceId}/semanticModels`,
       body,
       responseSchema: semanticModelSchema,
       expectedStatuses: [201, 202],
@@ -365,14 +454,54 @@ export class FabricClient {
     semanticModelId: string,
     operation: string,
   ): { readonly path: string } {
-    const allowedWorkspaceId = this.workspacePolicy.assertAllowed(workspaceId, operation, "fabric");
+    const validWorkspaceId = validateUuid(workspaceId, "workspaceId", operation, "fabric");
     const validSemanticModelId = validateUuid(
       semanticModelId,
       "semanticModelId",
       operation,
       "fabric",
     );
-    return { path: `/v1/workspaces/${allowedWorkspaceId}/semanticModels/${validSemanticModelId}` };
+    return { path: `/v1/workspaces/${validWorkspaceId}/semanticModels/${validSemanticModelId}` };
+  }
+
+  private workspaceItemPath(
+    workspaceId: string,
+    itemId: string,
+    itemField: string,
+    collection: string,
+    operation: string,
+  ): string {
+    const validWorkspaceId = validateUuid(workspaceId, "workspaceId", operation, "fabric");
+    const validItemId = validateUuid(itemId, itemField, operation, "fabric");
+    return `/v1/workspaces/${validWorkspaceId}/${collection}/${validItemId}`;
+  }
+
+  private async listWorkspaceCollection<T>(
+    operation: string,
+    path: string,
+    responseSchema: z.ZodType<{
+      readonly value: readonly T[];
+      readonly continuationToken?: string | null | undefined;
+    }>,
+  ): Promise<readonly T[]> {
+    const values: T[] = [];
+    let continuationToken: string | undefined;
+    for (let page = 1; page <= this.options.maxPages; page += 1) {
+      const response = await this.http.request({
+        service: "fabric",
+        operation,
+        method: "GET",
+        path,
+        query: { continuationToken },
+        responseSchema,
+        retryMode: "safe",
+      });
+      const body = this.requireData(response, operation);
+      values.push(...body.value);
+      continuationToken = body.continuationToken ?? undefined;
+      if (!continuationToken) return values;
+    }
+    throw this.paginationLimit(operation);
   }
 
   private parseInput<T>(schema: z.ZodType<T>, input: unknown, operation: string): T {

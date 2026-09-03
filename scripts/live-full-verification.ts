@@ -7,8 +7,10 @@ import { ConfigurationError, loadConfig, type AppConfig } from "../src/config.js
 import { createHttpApp } from "../src/http/app.js";
 import { createLogger, type Logger } from "../src/logging.js";
 import type { JsonValue } from "../src/mcp/schemas.js";
+import { TOOL_NAMES } from "../src/mcp/registry.js";
 import type { ModelSpec } from "../src/model/index.js";
 import { SemanticModelService } from "../src/services/semantic-model-service.js";
+import { requireLiveTestWorkspaceId } from "./live-workspace.js";
 
 try {
   process.loadEnvFile();
@@ -30,7 +32,7 @@ const liveModel: ModelSpec = {
   annotations: [],
   tables: [
     {
-      name: "Phase 6 Data",
+      name: "Verification Data",
       hidden: false,
       columns: [
         {
@@ -57,7 +59,7 @@ const liveModel: ModelSpec = {
       partitions: [
         {
           kind: "m",
-          name: "Phase 6 Data",
+          name: "Verification Data",
           mode: "import",
           expression:
             "#table(type table [Key = Int64.Type, Amount = Currency.Type], {{1, 100.0}, {2, 200.0}})",
@@ -66,9 +68,9 @@ const liveModel: ModelSpec = {
       ],
       measures: [
         {
-          name: "Phase 6 Total",
-          expression: "SUM('Phase 6 Data'[Amount])",
-          description: "Disposable Phase 6 DAX smoke measure.",
+          name: "Verification Total",
+          expression: "SUM('Verification Data'[Amount])",
+          description: "Disposable full-verification DAX measure.",
           formatString: "#,0.00",
           hidden: false,
           annotations: [],
@@ -83,11 +85,15 @@ const liveModel: ModelSpec = {
 const createChanges = [
   {
     action: "create",
-    target: { objectType: "measure", parentName: "Phase 6 Data", name: "Phase 6 Average" },
+    target: {
+      objectType: "measure",
+      parentName: "Verification Data",
+      name: "Verification Average",
+    },
     value: {
-      name: "Phase 6 Average",
-      expression: "AVERAGE('Phase 6 Data'[Amount])",
-      description: "Created by the Phase 6 release gate.",
+      name: "Verification Average",
+      expression: "AVERAGE('Verification Data'[Amount])",
+      description: "Created by the full production verification gate.",
       formatString: "#,0.00",
     },
   },
@@ -95,11 +101,11 @@ const createChanges = [
     action: "create",
     target: {
       objectType: "hierarchy",
-      parentName: "Phase 6 Data",
-      name: "Phase 6 Hierarchy",
+      parentName: "Verification Data",
+      name: "Verification Hierarchy",
     },
     value: {
-      name: "Phase 6 Hierarchy",
+      name: "Verification Hierarchy",
       levels: [
         { name: "Key", column: "Key" },
         { name: "Amount", column: "Amount" },
@@ -111,11 +117,15 @@ const createChanges = [
 const updateChanges = [
   {
     action: "update",
-    target: { objectType: "measure", parentName: "Phase 6 Data", name: "Phase 6 Average" },
+    target: {
+      objectType: "measure",
+      parentName: "Verification Data",
+      name: "Verification Average",
+    },
     value: {
-      name: "Phase 6 Average",
-      expression: "COALESCE(AVERAGE('Phase 6 Data'[Amount]), 0)",
-      description: "Updated by the Phase 6 release gate.",
+      name: "Verification Average",
+      expression: "COALESCE(AVERAGE('Verification Data'[Amount]), 0)",
+      description: "Updated by the full production verification gate.",
       formatString: "$#,0.00",
     },
   },
@@ -123,12 +133,12 @@ const updateChanges = [
     action: "update",
     target: {
       objectType: "hierarchy",
-      parentName: "Phase 6 Data",
-      name: "Phase 6 Hierarchy",
+      parentName: "Verification Data",
+      name: "Verification Hierarchy",
     },
     value: {
-      name: "Phase 6 Hierarchy",
-      description: "Updated by the Phase 6 release gate.",
+      name: "Verification Hierarchy",
+      description: "Updated by the full production verification gate.",
       levels: [
         { name: "Key", column: "Key" },
         { name: "Amount", column: "Amount" },
@@ -142,13 +152,17 @@ const deleteChanges = [
     action: "delete",
     target: {
       objectType: "hierarchy",
-      parentName: "Phase 6 Data",
-      name: "Phase 6 Hierarchy",
+      parentName: "Verification Data",
+      name: "Verification Hierarchy",
     },
   },
   {
     action: "delete",
-    target: { objectType: "measure", parentName: "Phase 6 Data", name: "Phase 6 Average" },
+    target: {
+      objectType: "measure",
+      parentName: "Verification Data",
+      name: "Verification Average",
+    },
   },
 ] as const;
 
@@ -184,12 +198,12 @@ async function runLifecycle(
   run: number,
   config: AppConfig,
   logger: Logger,
+  workspaceId: string,
 ): Promise<Readonly<Record<string, JsonValue>>> {
   const server = createServer(createHttpApp(config, logger));
-  const client = new Client({ name: `phase-six-live-check-${run}`, version: "1.0.0" });
-  const workspaceId = config.allowedWorkspaceIds[0]!;
+  const client = new Client({ name: `full-live-check-${run}`, version: "1.0.0" });
   const suffix = `${new Date().toISOString().replaceAll(/[-:.TZ]/gu, "")}-${randomUUID().slice(0, 8)}`;
-  const originalName = `MCP Phase 6 Run ${run} ${suffix}`;
+  const originalName = `MCP Full Verification Run ${run} ${suffix}`;
   const updatedName = `${originalName} Updated`;
   let currentName = originalName;
   let semanticModelId: string | undefined;
@@ -226,8 +240,8 @@ async function runLifecycle(
     );
     connected = true;
 
-    if ((await client.listTools()).tools.length !== 18) {
-      throw new Error("The live MCP server did not advertise exactly 18 tools.");
+    if ((await client.listTools()).tools.length !== TOOL_NAMES.length) {
+      throw new Error(`The live MCP server did not advertise exactly ${TOOL_NAMES.length} tools.`);
     }
     evidence["mcpContractVerified"] = true;
 
@@ -243,13 +257,13 @@ async function runLifecycle(
           workspace["id"] === workspaceId,
       )
     ) {
-      throw new Error("The allowlisted development workspace was not visible through MCP.");
+      throw new Error("The selected non-production workspace was not visible through MCP.");
     }
 
     const preview = await call("create_semantic_model", {
       workspaceId,
       displayName: originalName,
-      description: "Disposable Phase 6 release-candidate validation model.",
+      description: "Disposable full production-verification model.",
       model: liveModel,
     });
     if (preview.data?.["applied"] !== false) {
@@ -259,7 +273,7 @@ async function runLifecycle(
     const created = await call("create_semantic_model", {
       workspaceId,
       displayName: originalName,
-      description: "Disposable Phase 6 release-candidate validation model.",
+      description: "Disposable full production-verification model.",
       model: liveModel,
       apply: true,
     });
@@ -292,7 +306,7 @@ async function runLifecycle(
     await call("update_semantic_model_properties", {
       ...ids,
       displayName: updatedName,
-      description: "Updated disposable Phase 6 release-candidate validation model.",
+      description: "Updated disposable full production-verification model.",
       apply: true,
     });
     currentName = updatedName;
@@ -411,13 +425,13 @@ async function runLifecycle(
     }
     evidence["refreshVerified"] = true;
 
-    const validation = await call("validate_dax", { ...ids, expression: "[Phase 6 Total]" });
+    const validation = await call("validate_dax", { ...ids, expression: "[Verification Total]" });
     if (validation.data?.["valid"] !== true) throw new Error("Valid DAX was rejected.");
     const invalid = await call("validate_dax", { ...ids, expression: "SUM(" });
     if (invalid.data?.["valid"] !== false) throw new Error("Invalid DAX was accepted.");
     const query = await call("execute_dax", {
       ...ids,
-      query: 'EVALUATE ROW("Smoke", [Phase 6 Total])',
+      query: 'EVALUATE ROW("Smoke", [Verification Total])',
       maxRows: 1,
       includeNulls: true,
     });
@@ -493,33 +507,29 @@ async function runLifecycle(
   evidence["activeArtifactLeft"] = semanticModelId !== undefined && !deleted;
   if (primaryError instanceof Error) throw primaryError;
   if (primaryError !== undefined) {
-    throw new Error(`Phase 6 live lifecycle run ${run} failed.`, { cause: primaryError });
+    throw new Error(`Full live verification run ${run} failed.`, { cause: primaryError });
   }
   return evidence;
 }
 
 async function main(): Promise<void> {
-  if (process.env["PHASE6_LIVE_MUTATION"] !== "true") {
+  if (process.env["LIVE_FULL_MUTATION"] !== "true") {
     throw new ConfigurationError([
-      "PHASE6_LIVE_MUTATION must be true for the disposable Phase 6 live check.",
+      "LIVE_FULL_MUTATION must be true for the disposable full verification check.",
     ]);
   }
-  if (process.env["PHASE6_LIVE_PERMANENT_DELETE"] !== "true") {
+  if (process.env["LIVE_FULL_PERMANENT_DELETE"] !== "true") {
     throw new ConfigurationError([
-      "PHASE6_LIVE_PERMANENT_DELETE must be true because cleanup is irreversible.",
+      "LIVE_FULL_PERMANENT_DELETE must be true because cleanup is irreversible.",
     ]);
   }
   const config = loadConfig();
   if (config.readOnly) {
     throw new ConfigurationError([
-      "POWERBI_MCP_READONLY must be false for the disposable Phase 6 live check.",
+      "POWERBI_MCP_READONLY must be false for the disposable full verification check.",
     ]);
   }
-  if (config.allowedWorkspaceIds.length !== 1) {
-    throw new ConfigurationError([
-      "FABRIC_ALLOWED_WORKSPACE_IDS must contain exactly one development workspace.",
-    ]);
-  }
+  const workspaceId = requireLiveTestWorkspaceId();
 
   const logger = createLogger({
     level: config.logLevel,
@@ -530,7 +540,7 @@ async function main(): Promise<void> {
   });
   const runs: Readonly<Record<string, JsonValue>>[] = [];
   for (let run = 1; run <= 2; run += 1) {
-    runs.push(await runLifecycle(run, config, logger));
+    runs.push(await runLifecycle(run, config, logger, workspaceId));
   }
   process.stdout.write(`${JSON.stringify({ ok: true, completedRuns: runs.length, runs })}\n`);
 }
@@ -542,6 +552,6 @@ try {
     level: "error",
     knownSecrets: [process.env["MCP_API_KEY"] ?? "", process.env["AZURE_CLIENT_SECRET"] ?? ""],
   });
-  logger.error("Phase 6 live release-candidate check failed", { error });
+  logger.error("Full production verification failed", { error });
   process.exitCode = 1;
 }

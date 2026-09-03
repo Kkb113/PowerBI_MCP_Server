@@ -12,9 +12,9 @@ Fabric deletion can be recoverable or permanent, but Microsoft currently exclude
 from the item types that support recovery. Connection binding accepts one source reference per
 request.
 
-The Phase 3 model engine already validates a supported TMSL subset, applies an atomic change batch,
-and produces stable semantic hashes and diffs. Phase 4 must connect that engine to Fabric without
-weakening those guarantees.
+The model engine validates a supported TMSL subset, applies an atomic change batch, and produces
+stable semantic hashes and diffs. Lifecycle orchestration must connect that engine to Fabric
+without weakening those guarantees.
 
 ## Decision
 
@@ -53,8 +53,8 @@ connector requires a tested, deterministic mapping rather than a best-effort gue
 
 - Concurrent definition changes are visible and must be reconciled instead of being silently
   overwritten.
-- A timed-out synchronous request can safely return an operation handle, although Phase 5 must
-  expose the status workflow through MCP.
+- A timed-out synchronous request can safely return an operation handle for later status polling
+  through MCP.
 - Read-back mismatches surface as errors even when Fabric accepted a write.
 - Semantic-model deletion is available but intentionally difficult to invoke accidentally because
   Fabric cannot recover this item type.

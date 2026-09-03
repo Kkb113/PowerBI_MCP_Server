@@ -269,6 +269,7 @@ export function modelSpecToBim(input: unknown): ModelBim {
         kind: "m",
         expression: expression.expression,
         ...(expression.description === undefined ? {} : { description: expression.description }),
+        ...(expression.lineageTag === undefined ? {} : { lineageTag: expression.lineageTag }),
         annotations: expression.annotations,
       })),
       tables: [...tables, ...calculationGroupTables],
@@ -349,6 +350,7 @@ export function bimToModelSpec(input: unknown): ModelSpec {
       kind: "m" as const,
       expression: expressionText(expression.expression),
       ...(expression.description === undefined ? {} : { description: expression.description }),
+      ...(expression.lineageTag === undefined ? {} : { lineageTag: expression.lineageTag }),
       annotations: expression.annotations,
     })),
     tables: regularTables.map((table) => ({

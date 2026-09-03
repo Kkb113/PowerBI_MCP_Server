@@ -213,6 +213,7 @@ export const namedExpressionSchema = z.strictObject({
   kind: z.literal("m"),
   expression: expressionSchema,
   description: optionalDescriptionSchema,
+  lineageTag: lineageTagSchema,
   annotations: annotationsSchema,
 });
 
@@ -475,6 +476,7 @@ const tmslExpressionSchema = z.strictObject({
   kind: z.literal("m"),
   expression: expressionTextSchema,
   description: optionalDescriptionSchema,
+  lineageTag: lineageTagSchema,
   annotations: annotationsSchema,
 });
 

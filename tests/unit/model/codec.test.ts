@@ -269,6 +269,17 @@ describe("TMSL ModelSpec codec", () => {
     );
   });
 
+  it("accepts and preserves lineage tags returned by Fabric for named expressions", () => {
+    const lineageTag = "9c3bb856-5df1-4c7e-a6bb-5c775b930ad2";
+    const bim = structuredClone(loadModelBimFixture());
+    bim.model.expressions[0] = { ...bim.model.expressions[0]!, lineageTag };
+
+    const model = bimToModelSpec(bim);
+
+    expect(model.expressions[0]!.lineageTag).toBe(lineageTag);
+    expect(modelSpecToBim(model).model.expressions[0]!.lineageTag).toBe(lineageTag);
+  });
+
   it("validates every supplied definition part even when it is optional", () => {
     const definition = buildTmslDefinition(loadModelFixture());
     definition.parts.push({

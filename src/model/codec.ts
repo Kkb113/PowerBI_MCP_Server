@@ -95,113 +95,132 @@ const parseJson = (path: string, text: string): unknown => {
 
 export function modelSpecToBim(input: unknown): ModelBim {
   const model = normalizeModelSpec(input);
-  const tables = model.tables.map((table) => ({
-    name: table.name,
-    ...(table.description === undefined ? {} : { description: table.description }),
-    isHidden: table.hidden,
-    columns: table.columns.map((column) =>
-      column.kind === "source"
-        ? {
-            name: column.name,
-            sourceColumn: column.sourceColumn,
-            dataType: column.dataType,
-            ...(column.description === undefined ? {} : { description: column.description }),
-            ...(column.formatString === undefined ? {} : { formatString: column.formatString }),
-            isHidden: column.hidden,
-            isKey: column.key,
-            ...(column.sortByColumn === undefined ? {} : { sortByColumn: column.sortByColumn }),
-            summarizeBy: column.summarizeBy,
-            ...(column.isDefaultLabel === undefined
-              ? {}
-              : { isDefaultLabel: column.isDefaultLabel }),
-            ...(column.isAvailableInMdx === undefined
-              ? {}
-              : { isAvailableInMdx: column.isAvailableInMdx }),
-            ...(column.lineageTag === undefined ? {} : { lineageTag: column.lineageTag }),
-            annotations: column.annotations,
-          }
-        : {
-            type: "calculated" as const,
-            name: column.name,
-            expression: column.expression,
-            dataType: column.dataType,
-            ...(column.description === undefined ? {} : { description: column.description }),
-            ...(column.formatString === undefined ? {} : { formatString: column.formatString }),
-            isHidden: column.hidden,
-            ...(column.sortByColumn === undefined ? {} : { sortByColumn: column.sortByColumn }),
-            summarizeBy: column.summarizeBy,
-            ...(column.isDefaultLabel === undefined
-              ? {}
-              : { isDefaultLabel: column.isDefaultLabel }),
-            ...(column.isAvailableInMdx === undefined
-              ? {}
-              : { isAvailableInMdx: column.isAvailableInMdx }),
-            ...(column.lineageTag === undefined ? {} : { lineageTag: column.lineageTag }),
-            annotations: column.annotations,
-          },
-    ),
-    partitions: table.partitions.map((partition) => {
-      switch (partition.kind) {
-        case "m":
-          return {
-            name: partition.name,
-            mode: partition.mode,
-            source: { type: "m" as const, expression: partition.expression },
-            annotations: partition.annotations,
-          };
-        case "query":
-          return {
-            name: partition.name,
-            mode: partition.mode,
-            source: {
-              type: "query" as const,
-              query: partition.query,
-              dataSource: partition.dataSourceName,
+  const tables = model.tables.map((table) => {
+    const isCalculatedTable = table.partitions.some((partition) => partition.kind === "calculated");
+    return {
+      name: table.name,
+      ...(table.description === undefined ? {} : { description: table.description }),
+      isHidden: table.hidden,
+      columns: table.columns.map((column) =>
+        column.kind === "source"
+          ? {
+              type: isCalculatedTable ? ("calculatedTableColumn" as const) : ("data" as const),
+              name: column.name,
+              sourceColumn: column.sourceColumn,
+              dataType: column.dataType,
+              ...(column.sourceProviderType === undefined
+                ? {}
+                : { sourceProviderType: column.sourceProviderType }),
+              ...(isCalculatedTable && column.nameInferred !== undefined
+                ? { isNameInferred: column.nameInferred }
+                : {}),
+              ...(isCalculatedTable && column.dataTypeInferred !== undefined
+                ? { isDataTypeInferred: column.dataTypeInferred }
+                : {}),
+              ...(isCalculatedTable && column.columnOriginTable !== undefined
+                ? { columnOriginTable: column.columnOriginTable }
+                : {}),
+              ...(isCalculatedTable && column.columnOriginColumn !== undefined
+                ? { columnOriginColumn: column.columnOriginColumn }
+                : {}),
+              ...(column.description === undefined ? {} : { description: column.description }),
+              ...(column.formatString === undefined ? {} : { formatString: column.formatString }),
+              isHidden: column.hidden,
+              isKey: column.key,
+              ...(column.sortByColumn === undefined ? {} : { sortByColumn: column.sortByColumn }),
+              summarizeBy: column.summarizeBy,
+              ...(column.isDefaultLabel === undefined
+                ? {}
+                : { isDefaultLabel: column.isDefaultLabel }),
+              ...(column.isAvailableInMdx === undefined
+                ? {}
+                : { isAvailableInMdx: column.isAvailableInMdx }),
+              ...(column.lineageTag === undefined ? {} : { lineageTag: column.lineageTag }),
+              annotations: column.annotations,
+            }
+          : {
+              type: "calculated" as const,
+              name: column.name,
+              expression: column.expression,
+              dataType: column.dataType,
+              ...(column.description === undefined ? {} : { description: column.description }),
+              ...(column.formatString === undefined ? {} : { formatString: column.formatString }),
+              isHidden: column.hidden,
+              ...(column.sortByColumn === undefined ? {} : { sortByColumn: column.sortByColumn }),
+              summarizeBy: column.summarizeBy,
+              ...(column.isDefaultLabel === undefined
+                ? {}
+                : { isDefaultLabel: column.isDefaultLabel }),
+              ...(column.isAvailableInMdx === undefined
+                ? {}
+                : { isAvailableInMdx: column.isAvailableInMdx }),
+              ...(column.lineageTag === undefined ? {} : { lineageTag: column.lineageTag }),
+              annotations: column.annotations,
             },
-            annotations: partition.annotations,
-          };
-        case "entity":
-          return {
-            name: partition.name,
-            mode: partition.mode,
-            source: {
-              type: "entity" as const,
-              entityName: partition.entityName,
-              ...(partition.schemaName === undefined ? {} : { schemaName: partition.schemaName }),
-              expressionSource: partition.expressionSource,
-            },
-            annotations: partition.annotations,
-          };
-        case "calculated":
-          return {
-            name: partition.name,
-            mode: partition.mode,
-            source: { type: "calculated" as const, expression: partition.expression },
-            annotations: partition.annotations,
-          };
-      }
-    }),
-    measures: table.measures.map((measure) => ({
-      name: measure.name,
-      expression: measure.expression,
-      description: measure.description,
-      ...(measure.displayFolder === undefined ? {} : { displayFolder: measure.displayFolder }),
-      formatString: measure.formatString,
-      isHidden: measure.hidden,
-      ...(measure.lineageTag === undefined ? {} : { lineageTag: measure.lineageTag }),
-      annotations: measure.annotations,
-    })),
-    hierarchies: table.hierarchies.map((hierarchy) => ({
-      name: hierarchy.name,
-      ...(hierarchy.description === undefined ? {} : { description: hierarchy.description }),
-      isHidden: hierarchy.hidden,
-      levels: hierarchy.levels.map((level, ordinal) => ({ ...level, ordinal })),
-      ...(hierarchy.lineageTag === undefined ? {} : { lineageTag: hierarchy.lineageTag }),
-      annotations: hierarchy.annotations,
-    })),
-    ...(table.lineageTag === undefined ? {} : { lineageTag: table.lineageTag }),
-    annotations: table.annotations,
-  }));
+      ),
+      partitions: table.partitions.map((partition) => {
+        switch (partition.kind) {
+          case "m":
+            return {
+              name: partition.name,
+              mode: partition.mode,
+              source: { type: "m" as const, expression: partition.expression },
+              annotations: partition.annotations,
+            };
+          case "query":
+            return {
+              name: partition.name,
+              mode: partition.mode,
+              source: {
+                type: "query" as const,
+                query: partition.query,
+                dataSource: partition.dataSourceName,
+              },
+              annotations: partition.annotations,
+            };
+          case "entity":
+            return {
+              name: partition.name,
+              mode: partition.mode,
+              source: {
+                type: "entity" as const,
+                entityName: partition.entityName,
+                ...(partition.schemaName === undefined ? {} : { schemaName: partition.schemaName }),
+                expressionSource: partition.expressionSource,
+              },
+              annotations: partition.annotations,
+            };
+          case "calculated":
+            return {
+              name: partition.name,
+              mode: partition.mode,
+              source: { type: "calculated" as const, expression: partition.expression },
+              annotations: partition.annotations,
+            };
+        }
+      }),
+      measures: table.measures.map((measure) => ({
+        name: measure.name,
+        expression: measure.expression,
+        description: measure.description,
+        ...(measure.displayFolder === undefined ? {} : { displayFolder: measure.displayFolder }),
+        formatString: measure.formatString,
+        isHidden: measure.hidden,
+        ...(measure.lineageTag === undefined ? {} : { lineageTag: measure.lineageTag }),
+        annotations: measure.annotations,
+      })),
+      hierarchies: table.hierarchies.map((hierarchy) => ({
+        name: hierarchy.name,
+        ...(hierarchy.description === undefined ? {} : { description: hierarchy.description }),
+        isHidden: hierarchy.hidden,
+        levels: hierarchy.levels.map((level, ordinal) => ({ ...level, ordinal })),
+        ...(hierarchy.lineageTag === undefined ? {} : { lineageTag: hierarchy.lineageTag }),
+        annotations: hierarchy.annotations,
+      })),
+      ...(table.lineageTag === undefined ? {} : { lineageTag: table.lineageTag }),
+      annotations: table.annotations,
+    };
+  });
 
   const calculationGroupTables = model.calculationGroups.map((group) => ({
     name: group.tableName,
@@ -357,48 +376,68 @@ export function bimToModelSpec(input: unknown): ModelSpec {
       name: table.name,
       ...(table.description === undefined ? {} : { description: table.description }),
       hidden: table.isHidden,
-      columns: table.columns.map((column) =>
-        column.type === "calculated"
-          ? {
-              kind: "calculated" as const,
-              name: column.name,
-              expression: expressionText(column.expression),
-              dataType: column.dataType,
-              ...(column.description === undefined ? {} : { description: column.description }),
-              ...(column.formatString === undefined ? {} : { formatString: column.formatString }),
-              hidden: column.isHidden,
-              ...(column.sortByColumn === undefined ? {} : { sortByColumn: column.sortByColumn }),
-              summarizeBy: column.summarizeBy,
-              ...(column.isDefaultLabel === undefined
-                ? {}
-                : { isDefaultLabel: column.isDefaultLabel }),
-              ...(column.isAvailableInMdx === undefined
-                ? {}
-                : { isAvailableInMdx: column.isAvailableInMdx }),
-              ...(column.lineageTag === undefined ? {} : { lineageTag: column.lineageTag }),
-              annotations: column.annotations,
-            }
-          : {
-              kind: "source" as const,
-              name: column.name,
-              sourceColumn: column.sourceColumn,
-              dataType: column.dataType,
-              ...(column.description === undefined ? {} : { description: column.description }),
-              ...(column.formatString === undefined ? {} : { formatString: column.formatString }),
-              hidden: column.isHidden,
-              key: column.isKey,
-              ...(column.sortByColumn === undefined ? {} : { sortByColumn: column.sortByColumn }),
-              summarizeBy: column.summarizeBy,
-              ...(column.isDefaultLabel === undefined
-                ? {}
-                : { isDefaultLabel: column.isDefaultLabel }),
-              ...(column.isAvailableInMdx === undefined
-                ? {}
-                : { isAvailableInMdx: column.isAvailableInMdx }),
-              ...(column.lineageTag === undefined ? {} : { lineageTag: column.lineageTag }),
-              annotations: column.annotations,
-            },
-      ),
+      columns: table.columns
+        .filter((column) => column.type !== "rowNumber")
+        .map((column) =>
+          column.type === "calculated"
+            ? {
+                kind: "calculated" as const,
+                name: column.name,
+                expression: expressionText(column.expression),
+                dataType: column.dataType,
+                ...(column.description === undefined ? {} : { description: column.description }),
+                ...(column.formatString === undefined ? {} : { formatString: column.formatString }),
+                hidden: column.isHidden,
+                ...(column.sortByColumn === undefined ? {} : { sortByColumn: column.sortByColumn }),
+                summarizeBy: column.summarizeBy,
+                ...(column.isDefaultLabel === undefined
+                  ? {}
+                  : { isDefaultLabel: column.isDefaultLabel }),
+                ...(column.isAvailableInMdx === undefined
+                  ? {}
+                  : { isAvailableInMdx: column.isAvailableInMdx }),
+                ...(column.lineageTag === undefined ? {} : { lineageTag: column.lineageTag }),
+                annotations: column.annotations,
+              }
+            : {
+                kind: "source" as const,
+                name: column.name,
+                sourceColumn: column.sourceColumn,
+                dataType: column.dataType,
+                ...(column.sourceProviderType === undefined
+                  ? {}
+                  : { sourceProviderType: column.sourceProviderType }),
+                ...(column.type !== "calculatedTableColumn" || column.isNameInferred === undefined
+                  ? {}
+                  : { nameInferred: column.isNameInferred }),
+                ...(column.type !== "calculatedTableColumn" ||
+                column.isDataTypeInferred === undefined
+                  ? {}
+                  : { dataTypeInferred: column.isDataTypeInferred }),
+                ...(column.type !== "calculatedTableColumn" ||
+                column.columnOriginTable === undefined
+                  ? {}
+                  : { columnOriginTable: column.columnOriginTable }),
+                ...(column.type !== "calculatedTableColumn" ||
+                column.columnOriginColumn === undefined
+                  ? {}
+                  : { columnOriginColumn: column.columnOriginColumn }),
+                ...(column.description === undefined ? {} : { description: column.description }),
+                ...(column.formatString === undefined ? {} : { formatString: column.formatString }),
+                hidden: column.isHidden,
+                key: column.isKey,
+                ...(column.sortByColumn === undefined ? {} : { sortByColumn: column.sortByColumn }),
+                summarizeBy: column.summarizeBy,
+                ...(column.isDefaultLabel === undefined
+                  ? {}
+                  : { isDefaultLabel: column.isDefaultLabel }),
+                ...(column.isAvailableInMdx === undefined
+                  ? {}
+                  : { isAvailableInMdx: column.isAvailableInMdx }),
+                ...(column.lineageTag === undefined ? {} : { lineageTag: column.lineageTag }),
+                annotations: column.annotations,
+              },
+        ),
       partitions: table.partitions.map((partition) => {
         switch (partition.source.type) {
           case "m":
@@ -497,9 +536,10 @@ export function bimToModelSpec(input: unknown): ModelSpec {
           );
         }
         const calculationGroupPartition = table.partitions[0];
+        const columns = table.columns.filter((column) => column.type !== "rowNumber");
         if (
-          table.columns.length !== 1 ||
-          table.columns[0]?.type === "calculated" ||
+          columns.length !== 1 ||
+          columns[0]?.type === "calculated" ||
           table.partitions.length !== 1 ||
           calculationGroupPartition?.source.type !== "calculationGroup" ||
           calculationGroupPartition.mode !== "import" ||
@@ -511,7 +551,7 @@ export function bimToModelSpec(input: unknown): ModelSpec {
             `Calculation group table '${table.name}' has unsupported companion objects.`,
           );
         }
-        const column = table.columns[0];
+        const column = columns[0];
         if (!column) {
           throw new ModelError(
             "UNSUPPORTED_CALCULATION_GROUP",

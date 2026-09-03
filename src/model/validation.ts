@@ -324,6 +324,10 @@ export function validateModelSpec(model: ModelSpec): readonly ModelIssue[] {
   const allMeasures: Array<{ name: string }> = [];
   for (const [tablePosition, table] of model.tables.entries()) {
     const tablePath = `tables[${tablePosition}]`;
+    const isCalculatedTable = table.partitions.some((partition) => partition.kind === "calculated");
+    const isDirectLakeTable = table.partitions.some(
+      (partition) => partition.kind === "entity" && partition.mode === "directLake",
+    );
     issues.push(...duplicateNameIssues(table.columns, `${tablePath}.columns`));
     issues.push(...duplicateNameIssues(table.partitions, `${tablePath}.partitions`));
     issues.push(...duplicateNameIssues(table.measures, `${tablePath}.measures`));
@@ -331,6 +335,31 @@ export function validateModelSpec(model: ModelSpec): readonly ModelIssue[] {
     allMeasures.push(...table.measures);
 
     for (const [columnPosition, column] of table.columns.entries()) {
+      if (
+        column.kind === "source" &&
+        !isCalculatedTable &&
+        (column.nameInferred !== undefined ||
+          column.dataTypeInferred !== undefined ||
+          column.columnOriginTable !== undefined ||
+          column.columnOriginColumn !== undefined)
+      ) {
+        issues.push(
+          issue(
+            "CALCULATED_TABLE_COLUMN_METADATA_INVALID",
+            `${tablePath}.columns[${columnPosition}]`,
+            `Column '${table.name}[${column.name}]' uses calculated-table metadata but its table has no calculated partition.`,
+          ),
+        );
+      }
+      if (isDirectLakeTable && column.dataType === "binary") {
+        issues.push(
+          issue(
+            "DIRECT_LAKE_BINARY_COLUMN_UNSUPPORTED",
+            `${tablePath}.columns[${columnPosition}].dataType`,
+            `Direct Lake does not support binary column '${table.name}[${column.name}]'. Exclude it from the semantic model or expose a supported source representation.`,
+          ),
+        );
+      }
       if (column.sortByColumn) {
         if (!columnExists(table, column.sortByColumn)) {
           issues.push(

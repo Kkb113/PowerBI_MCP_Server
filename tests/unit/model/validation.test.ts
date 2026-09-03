@@ -70,6 +70,31 @@ describe("ModelSpec validation", () => {
     expect(codes(model)).toEqual(expect.arrayContaining(["SELF_REFERENCE", "MISSING_COLUMN"]));
   });
 
+  it("rejects binary columns before a Direct Lake definition reaches Fabric", () => {
+    const model = loadModelFixture();
+    const product = model.tables.find((table) => table.name === "Product")!;
+    product.columns[0]!.dataType = "binary";
+
+    const finding = validateModelSpec(model).find(
+      (issue) => issue.code === "DIRECT_LAKE_BINARY_COLUMN_UNSUPPORTED",
+    );
+    expect(finding?.path).toMatch(/\.columns\[0\]\.dataType$/u);
+    expect(finding?.message).toContain("Product");
+    expect(() => parseAndValidateModelSpec(model)).toThrowError(
+      expect.objectContaining({ code: "MODEL_VALIDATION_FAILED" }),
+    );
+  });
+
+  it("limits calculated-table inference metadata to calculated tables", () => {
+    const model = loadModelFixture();
+    const product = model.tables.find((table) => table.name === "Product")!;
+    const column = product.columns[0]!;
+    if (column.kind !== "source") throw new Error("Expected a source column fixture.");
+    column.nameInferred = true;
+
+    expect(codes(model)).toContain("CALCULATED_TABLE_COLUMN_METADATA_INVALID");
+  });
+
   it("detects relationship self-reference and calculation-group collisions", () => {
     const model = loadModelFixture();
     model.relationships[0]!.fromTable = "Calendar";

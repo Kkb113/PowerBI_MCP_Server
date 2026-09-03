@@ -2,7 +2,7 @@
 
 ## Release
 
-- Version: `1.1.1`
+- Version: `1.1.2`
 - Verification date: 2026-09-03
 - Runtime: Node.js `24.14.0`
 - MCP contract: 25 tools and two read-only resources
@@ -24,6 +24,8 @@ MCP-client end-to-end tests, coverage thresholds, and the production build.
 | Typed Fabric and Power BI request/response handling              | client integration and MCP workflow tests                            |
 | Entra/Fabric workspace authorization boundary                    | Fabric/Power BI client, configuration, and workflow tests            |
 | Deterministic model encoding and validation                      | model unit tests and `tests/e2e/model-engine.test.ts`                |
+| Calculated-table and server row-number TMSL compatibility        | `tests/unit/model/codec.test.ts`                                     |
+| Direct Lake binary-column rejection before mutation              | model validation and MCP workflow tests                              |
 | Atomic object CRUD and dependency conflicts                      | model engine and lifecycle-service tests                             |
 | Definition hash concurrency protection                           | lifecycle-service and semantic-model end-to-end tests                |
 | Preview-first writes and central read-only enforcement           | workflow, lifecycle, and client tests                                |
@@ -41,7 +43,21 @@ authenticated MCP discovery, restart recovery, secret-free logs, and graceful SI
 
 ## Verified results
 
-The production `1.1.1` source tree and deployed DAX path passed the following checks on 2026-09-03:
+Release `1.1.2` adds regression coverage for Fabric-generated `rowNumber` and
+`calculatedTableColumn` TMSL objects and blocks unsupported Direct Lake binary columns before a
+definition reaches Fabric. Pre-commit verification on 2026-09-03 produced these results:
+
+- `npm run check`: 25 test files and 208 tests passed; statement coverage was 93.04%, branch
+  coverage was 82.23%, function coverage was 93.98%, line coverage was 93.92%, and the production
+  TypeScript build completed successfully.
+- `npm run test:e2e`: five MCP end-to-end test files and eight scenarios passed.
+- `npm audit --omit=dev --audit-level=high`: no production dependency vulnerabilities were found.
+- The production image and runtime smoke gate is required to pass in GitHub Actions for the release
+  commit. The local Docker Desktop Linux engine was unavailable during pre-commit verification, so
+  no local container result is claimed here.
+
+The preceding production `1.1.1` source tree and deployed DAX path passed the following checks on
+2026-09-03:
 
 - `npm run check`: 25 test files and 204 tests passed; line coverage was 93.83%; the production
   TypeScript build completed successfully.

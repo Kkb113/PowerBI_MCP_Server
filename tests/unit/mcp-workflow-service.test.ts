@@ -548,6 +548,31 @@ describe("McpWorkflowService", () => {
     });
   });
 
+  it("reports unsupported Direct Lake binary columns in the pre-deployment gate", async () => {
+    const { service } = createHarness();
+    const directLakeModel = structuredClone(model);
+    const product = directLakeModel.tables.find((table) => table.name === "Product")!;
+    product.columns[0]!.dataType = "binary";
+
+    await expect(
+      service.execute("pre_deploy_gate", {
+        model: directLakeModel,
+        checks: ["structure"],
+      }),
+    ).resolves.toMatchObject({
+      data: {
+        passed: false,
+        definitionHash: null,
+        findings: [
+          expect.objectContaining({
+            code: "DIRECT_LAKE_BINARY_COLUMN_UNSUPPORTED",
+            severity: "error",
+          }),
+        ],
+      },
+    });
+  });
+
   it("rejects malformed tool input and non-truncation query errors", async () => {
     const { service, powerBiMocks } = createHarness();
     await expect(service.execute("list_semantic_models", {})).rejects.toBeInstanceOf(DomainError);

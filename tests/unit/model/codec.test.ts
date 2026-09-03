@@ -258,6 +258,66 @@ describe("TMSL ModelSpec codec", () => {
     });
   });
 
+  it("reads server-managed row numbers and preserves calculated-table columns", () => {
+    const bim = structuredClone(loadModelBimFixture()) as unknown as {
+      model: {
+        tables: Array<{
+          name: string;
+          columns: unknown[];
+        }>;
+      };
+    };
+    const calendar = bim.model.tables.find((table) => table.name === "Calendar")!;
+    calendar.columns.unshift({
+      type: "rowNumber",
+      name: "RowNumber-2662979B-1795-4F74-8F37-6A1BA8059B61",
+      dataType: "int64",
+      isHidden: true,
+      isUnique: true,
+      isKey: true,
+      isNullable: false,
+      attributeHierarchy: {},
+    });
+    calendar.columns[1] = {
+      type: "calculatedTableColumn",
+      name: "Date",
+      sourceColumn: "[Date]",
+      dataType: "dateTime",
+      isNameInferred: true,
+      isDataTypeInferred: true,
+      isHidden: false,
+      isKey: true,
+      summarizeBy: "none",
+      annotations: [],
+    };
+
+    const model = bimToModelSpec(bim);
+    const dateColumn = model.tables
+      .find((table) => table.name === "Calendar")!
+      .columns.find((column) => column.name === "Date")!;
+
+    expect(model.tables.find((table) => table.name === "Calendar")!.columns).toHaveLength(4);
+    expect(dateColumn).toMatchObject({
+      kind: "source",
+      sourceColumn: "[Date]",
+      nameInferred: true,
+      dataTypeInferred: true,
+    });
+    expect(
+      modelSpecToBim(model).model.tables.find((table) => table.name === "Calendar")!.columns,
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "calculatedTableColumn",
+          name: "Date",
+          sourceColumn: "[Date]",
+          isNameInferred: true,
+          isDataTypeInferred: true,
+        }),
+      ]),
+    );
+  });
+
   it("fails closed for unknown fields and composite relationships", () => {
     const withUnknown = structuredClone(loadModelBimFixture()) as unknown as {
       unexpected?: boolean;

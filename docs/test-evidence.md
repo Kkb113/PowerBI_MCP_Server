@@ -71,8 +71,9 @@ Results from the release-candidate tree on 2026-09-03:
 - Phase 6 live run 2: passed every operation above from a new model; permanent delete verified
 - Post-delete active artifacts: none from either completed run
 - Official MCP Inspector strict `tools/list`: passed with 18 tools and no portability error
-- GitHub Actions quality gate: pending candidate commit
-- GitHub Actions production container gate: pending candidate commit
+- GitHub Actions quality gate: passed in 43 seconds in
+  [CI run 33702784497](https://github.com/Kkb113/PowerBI_MCP_Server/actions/runs/33702784497)
+- GitHub Actions production container gate: passed in 38 seconds in the same clean-checkout CI run
 
 The pre-candidate runs found and resolved two verifier issues and one product boundary defect: Docker
 Desktop can reassign an automatically published host port after restart, a complete Fabric

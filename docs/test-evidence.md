@@ -44,11 +44,12 @@ authenticated MCP discovery, restart recovery, secret-free logs, and graceful SI
 ## Verified results
 
 Release `1.1.2` adds regression coverage for Fabric-generated `rowNumber` and
-`calculatedTableColumn` TMSL objects and blocks unsupported Direct Lake binary columns before a
-definition reaches Fabric. Pre-commit verification on 2026-09-03 produced these results:
+`calculatedTableColumn` TMSL objects, preserves model collation and default storage mode, and blocks
+unsupported Direct Lake binary columns before a definition reaches Fabric. Pre-commit verification
+on 2026-09-03 produced these results:
 
-- `npm run check`: 25 test files and 208 tests passed; statement coverage was 93.04%, branch
-  coverage was 82.23%, function coverage was 93.98%, line coverage was 93.92%, and the production
+- `npm run check`: 25 test files and 209 tests passed; statement coverage was 93.04%, branch
+  coverage was 82.31%, function coverage was 93.98%, line coverage was 93.92%, and the production
   TypeScript build completed successfully.
 - `npm run test:e2e`: five MCP end-to-end test files and eight scenarios passed.
 - `npm audit --omit=dev --audit-level=high`: no production dependency vulnerabilities were found.

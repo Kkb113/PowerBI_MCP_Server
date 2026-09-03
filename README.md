@@ -377,7 +377,8 @@ and grant Fabric workspace/item permissions directly to that identity.
 ## Supported model boundary
 
 The service uses the TMSL `model.bim` representation as its canonical semantic-model definition. It
-supports structured data-source metadata without credentials; source, calculated, and
+supports model culture, collation, and default storage mode; structured data-source metadata
+without credentials; source, calculated, and
 calculated-table columns; server-generated row-number columns on read; M, query, entity/Direct
 Lake, calculated, and calculation-group partitions; measures; single-column relationships;
 hierarchies; calculation groups and items; named M expressions; and read-only roles with table

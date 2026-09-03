@@ -33,6 +33,25 @@ describe("TMSL ModelSpec codec", () => {
     ]);
   });
 
+  it("preserves model collation and default storage mode", () => {
+    const model = loadModelFixture();
+    model.collation = "Latin1_General_100_BIN2_UTF8";
+    model.defaultMode = "directLake";
+
+    const bim = modelSpecToBim(model);
+    const converted = bimToModelSpec(bim);
+
+    expect(bim.model).toMatchObject({
+      collation: "Latin1_General_100_BIN2_UTF8",
+      defaultMode: "directLake",
+    });
+    expect(converted).toMatchObject({
+      collation: "Latin1_General_100_BIN2_UTF8",
+      defaultMode: "directLake",
+    });
+    expect(diffModelSpecs(model, converted)).toMatchObject({ hasChanges: false, totalChanges: 0 });
+  });
+
   it("converts every supported partition source and multiline expression", () => {
     const model = loadModelFixture();
     const bim = modelSpecToBim(model);

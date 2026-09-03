@@ -268,6 +268,8 @@ export function modelSpecToBim(input: unknown): ModelBim {
     compatibilityLevel: model.compatibilityLevel,
     model: {
       culture: model.culture,
+      ...(model.collation === undefined ? {} : { collation: model.collation }),
+      ...(model.defaultMode === undefined ? {} : { defaultMode: model.defaultMode }),
       ...(model.sourceQueryCulture === undefined
         ? {}
         : { sourceQueryCulture: model.sourceQueryCulture }),
@@ -349,6 +351,8 @@ export function bimToModelSpec(input: unknown): ModelSpec {
   const spec = {
     compatibilityLevel: bim.compatibilityLevel,
     culture: bim.model.culture,
+    ...(bim.model.collation === undefined ? {} : { collation: bim.model.collation }),
+    ...(bim.model.defaultMode === undefined ? {} : { defaultMode: bim.model.defaultMode }),
     ...(bim.model.sourceQueryCulture === undefined
       ? {}
       : { sourceQueryCulture: bim.model.sourceQueryCulture }),

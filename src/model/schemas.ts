@@ -16,6 +16,7 @@ export const dataTypeSchema = z.enum([
   "unknown",
   "variant",
 ]);
+export const modelModeSchema = z.enum(["import", "directQuery", "push", "dual", "directLake"]);
 export const summarizeBySchema = z.enum([
   "none",
   "sum",
@@ -244,6 +245,8 @@ export const roleSchema = z.strictObject({
 export const modelSpecSchema = z.strictObject({
   compatibilityLevel: z.number().int().min(1_520).max(2_000).default(1_702),
   culture: z.string().trim().min(2).max(32).default("en-US"),
+  collation: z.string().trim().min(1).max(256).optional(),
+  defaultMode: modelModeSchema.optional(),
   sourceQueryCulture: z.string().trim().min(2).max(32).optional(),
   description: optionalDescriptionSchema,
   defaultPowerBIDataSourceVersion: z.literal("powerBI_V3").default("powerBI_V3"),
@@ -542,6 +545,8 @@ export const modelBimSchema = z.strictObject({
   compatibilityLevel: z.number().int().min(1_520).max(2_000),
   model: z.strictObject({
     culture: z.string().trim().min(2).max(32),
+    collation: z.string().trim().min(1).max(256).optional(),
+    defaultMode: modelModeSchema.optional(),
     sourceQueryCulture: z.string().trim().min(2).max(32).optional(),
     description: optionalDescriptionSchema,
     defaultPowerBIDataSourceVersion: z.literal("powerBI_V3").default("powerBI_V3"),

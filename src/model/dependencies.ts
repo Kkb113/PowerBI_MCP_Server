@@ -35,10 +35,17 @@ export function findModelReferences(
     for (const partition of table.partitions) {
       if (
         target.objectType === "data_source" &&
-        (partition.kind === "query" || partition.kind === "entity") &&
+        partition.kind === "query" &&
         sameName(partition.dataSourceName, target.name)
       ) {
         add("partition", `${table.name}/${partition.name}`, "dataSourceName");
+      }
+      if (
+        target.objectType === "expression" &&
+        partition.kind === "entity" &&
+        sameName(partition.expressionSource, target.name)
+      ) {
+        add("partition", `${table.name}/${partition.name}`, "expressionSource");
       }
       if (
         target.objectType === "expression" &&

@@ -329,7 +329,12 @@ describe("dependency reporting", () => {
     ).toEqual(expect.arrayContaining([expect.objectContaining({ objectType: "partition" })]));
     expect(
       findModelReferences(model, { objectType: "expression", name: "Parameter – Server" }),
-    ).toEqual(expect.arrayContaining([expect.objectContaining({ objectType: "expression" })]));
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ objectType: "expression", property: "expression" }),
+        expect.objectContaining({ objectType: "partition", property: "expressionSource" }),
+      ]),
+    );
     expect(
       findModelReferences(model, {
         objectType: "measure",

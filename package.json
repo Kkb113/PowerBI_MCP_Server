@@ -24,6 +24,7 @@
     "test:live:data": "tsx scripts/live-data-smoke.ts",
     "test:live:lifecycle": "tsx scripts/live-model-lifecycle.ts",
     "test:live:dax-refresh": "tsx scripts/live-dax-refresh.ts",
+    "test:live:direct-lake": "tsx scripts/live-direct-lake.ts",
     "test:live:full": "tsx scripts/live-full-verification.ts",
     "typecheck": "tsc --noEmit"
   },

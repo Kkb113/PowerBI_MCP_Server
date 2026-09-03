@@ -300,6 +300,9 @@ export function validateModelSpec(model: ModelSpec): readonly ModelIssue[] {
 
   const tables = tableIndex(model);
   const dataSources = new Set(model.dataSources.map((source) => canonicalName(source.name)));
+  const expressions = new Set(
+    model.expressions.map((expression) => canonicalName(expression.name)),
+  );
   const modelTableNames = new Map(
     model.tables.map((table) => [canonicalName(table.name), table.name]),
   );
@@ -350,15 +353,24 @@ export function validateModelSpec(model: ModelSpec): readonly ModelIssue[] {
     }
 
     for (const [partitionPosition, partition] of table.partitions.entries()) {
-      if (
-        (partition.kind === "query" || partition.kind === "entity") &&
-        !dataSources.has(canonicalName(partition.dataSourceName))
-      ) {
+      if (partition.kind === "query" && !dataSources.has(canonicalName(partition.dataSourceName))) {
         issues.push(
           issue(
             "MISSING_DATA_SOURCE",
             `${tablePath}.partitions[${partitionPosition}].dataSourceName`,
             `Partition references missing data source '${partition.dataSourceName}'.`,
+          ),
+        );
+      }
+      if (
+        partition.kind === "entity" &&
+        !expressions.has(canonicalName(partition.expressionSource))
+      ) {
+        issues.push(
+          issue(
+            "MISSING_EXPRESSION",
+            `${tablePath}.partitions[${partitionPosition}].expressionSource`,
+            `Direct Lake partition references missing expression '${partition.expressionSource}'.`,
           ),
         );
       }

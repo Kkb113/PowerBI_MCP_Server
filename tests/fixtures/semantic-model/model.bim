@@ -42,11 +42,11 @@
         "kind": "m",
         "expression": [
           "let",
-          "    Value = \"example.datawarehouse.fabric.microsoft.com\"",
+          "    Source = AzureStorage.DataLake(\"https://onelake.dfs.fabric.microsoft.com/00000000-0000-0000-0000-000000000001/00000000-0000-0000-0000-000000000002\", [HierarchicalNavigation=true])",
           "in",
-          "    Value"
+          "    Source"
         ],
-        "description": "Unicode and multiline M fixture.",
+        "description": "Shared Direct Lake source expression fixture.",
         "annotations": []
       }
     ],
@@ -203,7 +203,7 @@
               "type": "entity",
               "entityName": "DimProduct",
               "schemaName": "dbo",
-              "dataSource": "Warehouse Source"
+              "expressionSource": "Parameter – Server"
             },
             "annotations": []
           }

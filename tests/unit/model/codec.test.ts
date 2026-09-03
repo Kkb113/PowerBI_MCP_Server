@@ -41,6 +41,17 @@ describe("TMSL ModelSpec codec", () => {
     );
     expect(sourceTypes).toEqual(expect.arrayContaining(["m", "query", "entity", "calculated"]));
     expect(bim.model.expressions[0]!.expression).toContain("\n");
+
+    const directLakeSource = bim.model.tables
+      .find((table) => table.name === "Product")!
+      .partitions.find((partition) => partition.source.type === "entity")!.source;
+    expect(directLakeSource).toEqual({
+      type: "entity",
+      entityName: "DimProduct",
+      schemaName: "dbo",
+      expressionSource: "Parameter – Server",
+    });
+    expect(directLakeSource).not.toHaveProperty("dataSource");
   });
 
   it("builds deterministic Fabric definition parts and parses them", () => {

@@ -41,15 +41,23 @@ describe("ModelSpec validation", () => {
     expect(codes(model)).toContain("DUPLICATE_NAME");
   });
 
-  it("detects table, column, data-source, and role reference failures", () => {
+  it("detects table, column, expression, data-source, and role reference failures", () => {
     const model = loadModelFixture();
     model.relationships[0]!.fromTable = "Missing";
     model.relationships[1]!.toColumn = "Missing";
     const productPartition = model.tables.find((table) => table.name === "Product")!.partitions[0]!;
-    if (productPartition.kind === "entity") productPartition.dataSourceName = "Missing";
+    if (productPartition.kind === "entity") productPartition.expressionSource = "Missing";
+    const queryPartition = model.tables.find((table) => table.name === "Sales Data")!
+      .partitions[0]!;
+    if (queryPartition.kind === "query") queryPartition.dataSourceName = "Missing";
     model.roles[0]!.tablePermissions[0]!.table = "Missing";
     expect(codes(model)).toEqual(
-      expect.arrayContaining(["MISSING_TABLE", "MISSING_COLUMN", "MISSING_DATA_SOURCE"]),
+      expect.arrayContaining([
+        "MISSING_TABLE",
+        "MISSING_COLUMN",
+        "MISSING_EXPRESSION",
+        "MISSING_DATA_SOURCE",
+      ]),
     );
   });
 

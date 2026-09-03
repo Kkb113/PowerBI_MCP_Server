@@ -168,7 +168,7 @@ export function modelSpecToBim(input: unknown): ModelBim {
               type: "entity" as const,
               entityName: partition.entityName,
               ...(partition.schemaName === undefined ? {} : { schemaName: partition.schemaName }),
-              dataSource: partition.dataSourceName,
+              expressionSource: partition.expressionSource,
             },
             annotations: partition.annotations,
           };
@@ -423,7 +423,7 @@ export function bimToModelSpec(input: unknown): ModelSpec {
               kind: "entity" as const,
               name: partition.name,
               mode: partition.mode,
-              dataSourceName: partition.source.dataSource,
+              expressionSource: partition.source.expressionSource,
               entityName: partition.source.entityName,
               ...(partition.source.schemaName === undefined
                 ? {}

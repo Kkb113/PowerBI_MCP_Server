@@ -30,6 +30,12 @@ The supported definition subset is deliberately small:
 - measures, single-column relationships, hierarchies, calculation groups and items;
 - named M expressions and read-only roles with table filters.
 
+Direct Lake on OneLake is represented by one shared named M expression that points to the OneLake
+workspace and item path. Every entity partition references that expression through
+`expressionSource`; it does not reference a structured TDS data source. Query partitions continue
+to reference structured data sources through `dataSourceName`. Validation and dependency checks
+enforce these distinct contracts before any definition reaches Fabric.
+
 Collections with set semantics are normalized by case-insensitive name. Hierarchy-level and
 calculation-item order is preserved. DAX and M line endings are normalized to LF. Object keys are
 canonicalized before hashing and serialization.

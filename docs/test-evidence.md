@@ -98,6 +98,13 @@ Each run performs the following operations:
 Cleanup runs in `finally` with a direct Fabric fallback when the MCP connection is unavailable. A
 failed cleanup fails the verification and must be resolved before deployment.
 
+`npm run test:live:direct-lake` is the guarded acceptance check for Lakehouse-backed Direct Lake
+models. In addition to the workspace and mutation acknowledgements, it requires
+`FABRIC_TEST_LAKEHOUSE_ID` and `FABRIC_TEST_LAKEHOUSE_TABLE`. The check inspects the source table
+through MCP, creates a disposable model with a shared OneLake named expression and entity partition,
+verifies the `expressionSource` after Fabric readback, completes a refresh and DAX query, and then
+permanently deletes the item. It reports only aggregate evidence and never emits source rows.
+
 ## Production acceptance
 
 Deployment acceptance requires all of the following:

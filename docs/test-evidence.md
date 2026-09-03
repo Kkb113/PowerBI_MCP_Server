@@ -41,16 +41,25 @@ authenticated MCP discovery, restart recovery, secret-free logs, and graceful SI
 
 ## Verified results
 
-The production `1.1.1` source tree passed the following checks on 2026-09-03:
+The production `1.1.1` source tree and deployed DAX path passed the following checks on 2026-09-03:
 
 - `npm run check`: 25 test files and 204 tests passed; line coverage was 93.83%; the production
   TypeScript build completed successfully.
-- `npm run test:container`: Node.js `v24.14.0`, UID `1000`, 25 tools, two resources, restart, and
-  graceful shutdown checks passed; the production dependency audit reported no vulnerabilities.
-- OAuth interoperability verification covered both MCP protected-resource metadata routes,
-  standards-compliant bearer challenges, required-scope enforcement, protocol initialization, tool
-  discovery, and signed-JWT verification against a remote JWKS. API-key compatibility remained
-  covered by the existing HTTP, MCP, and container gates.
+- `npm audit --omit=dev --audit-level=high`: no production dependency vulnerabilities were found.
+- GitHub Actions run `33729127640` passed both the quality gate and production container gate for
+  commit `96a32ce9cfc6825672863664f1caed1ad383d756`.
+- The deployed MCP listed current semantic models and confirmed that the deleted test model was no
+  longer present. A bounded literal DAX query and an `en-US` culture query both succeeded through
+  the service principal. An invalid measure returned the expected Arrow error-rowset result, and a
+  nonexistent model ID returned the non-retryable `SEMANTIC_MODEL_NOT_FOUND` contract.
+
+The immediately preceding `1.1.0` production acceptance baseline also passed these live checks on
+2026-09-03; the `1.1.1` change did not modify their implementation paths:
+
+- OAuth interoperability covered both MCP protected-resource metadata routes, standards-compliant
+  bearer challenges, required-scope enforcement, protocol initialization, tool discovery, and
+  signed-JWT verification against a remote JWKS. API-key compatibility remained covered by the
+  existing HTTP, MCP, and container gates.
 - `npm run test:live:data`: the configured service principal discovered three authorized
   workspaces, 27 Lakehouses, and two Warehouses; listed nine Lakehouse tables; inspected 25 SQL
   endpoint columns; and completed a bounded one-column, one-row sample without exposing IDs,
@@ -64,9 +73,9 @@ The production `1.1.1` source tree passed the following checks on 2026-09-03:
 
 ## Live mutation verification result
 
-The guarded `npm run test:live:full` acceptance check passed on 2026-09-03. It executed two complete,
-independent lifecycles against the approved non-production workspace. Both runs returned
-`createVerified`, `propertyUpdateVerified`, `staleHashRejected`, `objectCrudVerified`,
+The guarded `npm run test:live:full` acceptance check passed for release `1.1.0` on 2026-09-03. It
+executed two complete, independent lifecycles against the approved non-production workspace. Both
+runs returned `createVerified`, `propertyUpdateVerified`, `staleHashRejected`, `objectCrudVerified`,
 `definitionReadbackVerified`, `diffAndGateVerified`, `refreshVerified`, `daxVerified`, and
 `permanentDeleteVerified` as true. Both runs returned `activeArtifactLeft` as false, confirming that
 the disposable semantic models were permanently removed.

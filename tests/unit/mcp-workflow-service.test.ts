@@ -243,7 +243,7 @@ describe("McpWorkflowService", () => {
     });
   });
 
-  it("caps JSON DAX rows at the lower server limit and reports Power BI truncation", async () => {
+  it("caps Arrow DAX rows at the lower server limit and reports Power BI truncation", async () => {
     const { service, powerBiMocks } = createHarness({ maxRows: 2 });
     powerBiMocks.executeDax.mockResolvedValue({
       results: [
@@ -276,6 +276,7 @@ describe("McpWorkflowService", () => {
     expect(powerBiMocks.executeDax).toHaveBeenCalledWith(WORKSPACE_ID, MODEL_ID, {
       query: 'EVALUATE ROW("n", 1)',
       includeNulls: true,
+      maxRows: 2,
     });
   });
 
@@ -334,7 +335,7 @@ describe("McpWorkflowService", () => {
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
-  it("fails explicitly when the JSON endpoint receives a culture override", async () => {
+  it("canonicalizes and forwards an Arrow endpoint culture override", async () => {
     const { service, powerBiMocks } = createHarness();
     await expect(
       service.execute("execute_dax", {
@@ -343,7 +344,26 @@ describe("McpWorkflowService", () => {
         query: "EVALUATE ROW()",
         culture: "en-US",
       }),
-    ).rejects.toMatchObject({ code: "DAX_CULTURE_OVERRIDE_UNSUPPORTED" });
+    ).resolves.toMatchObject({ status: "success" });
+    expect(powerBiMocks.executeDax).toHaveBeenCalledWith(WORKSPACE_ID, MODEL_ID, {
+      query: "EVALUATE ROW()",
+      includeNulls: false,
+      maxRows: 2,
+      culture: "en-US",
+    });
+  });
+
+  it("rejects an invalid DAX culture before calling Power BI", async () => {
+    const { service, powerBiMocks } = createHarness();
+
+    await expect(
+      service.execute("execute_dax", {
+        workspaceId: WORKSPACE_ID,
+        semanticModelId: MODEL_ID,
+        query: "EVALUATE ROW()",
+        culture: "not_a_locale",
+      }),
+    ).rejects.toMatchObject({ code: "INVALID_DAX_CULTURE" });
     expect(powerBiMocks.executeDax).not.toHaveBeenCalled();
   });
 

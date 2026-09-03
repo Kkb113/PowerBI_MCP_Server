@@ -2,7 +2,7 @@
 
 ## Release
 
-- Version: `1.1.0`
+- Version: `1.1.1`
 - Verification date: 2026-09-03
 - Runtime: Node.js `24.14.0`
 - MCP contract: 25 tools and two read-only resources
@@ -28,7 +28,7 @@ MCP-client end-to-end tests, coverage thresholds, and the production build.
 | Definition hash concurrency protection                           | lifecycle-service and semantic-model end-to-end tests                |
 | Preview-first writes and central read-only enforcement           | workflow, lifecycle, and client tests                                |
 | Permanent-delete confirmation                                    | contract, lifecycle-service, and semantic-model end-to-end tests     |
-| DAX row/response bounds and stable errors                        | workflow and Power BI client tests                                   |
+| Service-principal DAX, Arrow decoding, row/response bounds       | Arrow parser, workflow, and Power BI client tests                    |
 | Refresh and long-running-operation resumption                    | lifecycle, workflow, and client tests                                |
 | Lakehouse/Warehouse discovery and response parsing               | Fabric client, data-service, and MCP end-to-end tests                |
 | Fabric SQL host restriction, token scope, and query construction | `tests/integration/fabric-sql-client.test.ts`                        |
@@ -41,9 +41,9 @@ authenticated MCP discovery, restart recovery, secret-free logs, and graceful SI
 
 ## Verified results
 
-The production `1.1.0` tree passed the following checks on 2026-09-03:
+The production `1.1.1` source tree passed the following checks on 2026-09-03:
 
-- `npm run check`: 24 test files and 196 tests passed; line coverage was 94.49%; the production
+- `npm run check`: 25 test files and 204 tests passed; line coverage was 93.83%; the production
   TypeScript build completed successfully.
 - `npm run test:container`: Node.js `v24.14.0`, UID `1000`, 25 tools, two resources, restart, and
   graceful shutdown checks passed; the production dependency audit reported no vulnerabilities.

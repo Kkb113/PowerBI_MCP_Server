@@ -551,14 +551,14 @@ export class McpWorkflowService implements McpToolHandler {
   }
 
   private async validateDax(input: ToolInput<"validate_dax">): Promise<ToolExecution> {
-    this.assertJsonEndpointCulture(input.culture);
+    const culture = this.normalizeDaxCulture(input.culture);
     const lint = lintDax(input.expression);
     const probe = buildDaxValidationProbe(input.expression);
     try {
-      await this.runDax(input.workspaceId, input.semanticModelId, probe, 1, true);
+      await this.runDax(input.workspaceId, input.semanticModelId, probe, 1, true, culture);
       return successExecution("DAX validation completed.", {
         valid: true,
-        authoritative: "powerbi_executeQueries",
+        authoritative: "powerbi_executeDaxQueries",
         probeKind: probe === input.expression.trim() ? "query" : "scalar_wrapper",
         lint,
       });
@@ -566,7 +566,7 @@ export class McpWorkflowService implements McpToolHandler {
       if (error instanceof ApiError && error.service === "powerbi" && error.httpStatus === 400) {
         return successExecution("DAX validation completed with an invalid expression.", {
           valid: false,
-          authoritative: "powerbi_executeQueries",
+          authoritative: "powerbi_executeDaxQueries",
           lint,
           validationError: { code: error.serviceCode ?? error.code, message: error.message },
         });
@@ -574,7 +574,7 @@ export class McpWorkflowService implements McpToolHandler {
       if (error instanceof DomainError && error.code === "DAX_QUERY_FAILED") {
         return successExecution("DAX validation completed with an invalid expression.", {
           valid: false,
-          authoritative: "powerbi_executeQueries",
+          authoritative: "powerbi_executeDaxQueries",
           lint,
           validationError: { code: error.code, message: error.message },
         });
@@ -584,13 +584,14 @@ export class McpWorkflowService implements McpToolHandler {
   }
 
   private async executeDax(input: ToolInput<"execute_dax">): Promise<ToolExecution> {
-    this.assertJsonEndpointCulture(input.culture);
+    const culture = this.normalizeDaxCulture(input.culture);
     const result = await this.runDax(
       input.workspaceId,
       input.semanticModelId,
       input.query,
       input.maxRows,
       input.includeNulls,
+      culture,
     );
     return this.boundedSuccess("DAX query completed.", result);
   }
@@ -601,11 +602,14 @@ export class McpWorkflowService implements McpToolHandler {
     query: string,
     requestedMaxRows: number,
     includeNulls: boolean,
+    culture: string | undefined,
   ) {
     const maxRows = Math.min(requestedMaxRows, this.options.maxDaxRows);
     const response = await this.powerBi.executeDax(workspaceId, semanticModelId, {
       query,
       includeNulls,
+      maxRows,
+      ...(culture === undefined ? {} : { culture }),
     });
     const errors = queryErrors(response);
     const truncationErrors = errors.filter((error) => TRUNCATION_PATTERN.test(error.message));
@@ -863,17 +867,13 @@ export class McpWorkflowService implements McpToolHandler {
     });
   }
 
-  private assertJsonEndpointCulture(culture: string | undefined): void {
-    if (culture === undefined) return;
+  private normalizeDaxCulture(culture: string | undefined): string | undefined {
+    if (culture === undefined) return undefined;
     try {
-      Intl.getCanonicalLocales(culture);
+      return Intl.getCanonicalLocales(culture)[0];
     } catch {
       throw new DomainError("INVALID_DAX_CULTURE", `Culture '${culture}' is not a valid locale.`);
     }
-    throw new DomainError(
-      "DAX_CULTURE_OVERRIDE_UNSUPPORTED",
-      "The JSON executeQueries endpoint does not support a per-request culture override. Omit culture to use the semantic model culture.",
-    );
   }
 
   private boundedSuccess(

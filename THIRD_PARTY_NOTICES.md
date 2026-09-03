@@ -1,5 +1,16 @@
 # Third-party notices
 
+## Apache Arrow JavaScript
+
+The production server uses `apache-arrow` 21.2.0 to decode bounded Power BI DAX query responses in
+the Apache Arrow IPC format. Apache Arrow JavaScript is licensed under the Apache License 2.0. The
+license is included in the distributed dependency package.
+
+## lz4js
+
+The production server uses `lz4js` 0.2.0 to decode the LZ4 frame compression required by Power BI
+Arrow record batches. `lz4js` is licensed under the ISC License.
+
 ## Tedious
 
 The production server uses `tedious` 20.0.0 for read-only TDS connections to Fabric SQL

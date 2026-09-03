@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { CompressionType, tableFromArrays, tableToIPC } from "apache-arrow";
 import { FabricClient } from "../../src/clients/fabric-client.js";
 import { ResilientHttpClient } from "../../src/clients/http-client.js";
 import { PowerBiClient } from "../../src/clients/powerbi-client.js";
@@ -13,6 +14,14 @@ const MODEL_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const writeJson = (response: ServerResponse, status: number, value: unknown): void => {
   response.writeHead(status, { "content-type": "application/json", "x-ms-request-id": "fixture" });
   response.end(JSON.stringify(value));
+};
+
+const writeArrow = (response: ServerResponse, value: Uint8Array): void => {
+  response.writeHead(200, {
+    "content-type": "application/vnd.apache.arrow.stream",
+    "x-ms-request-id": "fixture",
+  });
+  response.end(value);
 };
 
 const readBody = async (request: IncomingMessage): Promise<string> => {
@@ -41,7 +50,7 @@ describe("Microsoft clients end to end", () => {
     );
   });
 
-  it("uses real HTTP, separate audience tokens, pagination, and JSON DAX serialization", async () => {
+  it("uses real HTTP, separate audience tokens, pagination, and Arrow DAX serialization", async () => {
     const observed: Array<{ authorization: string | undefined; path: string; body: string }> = [];
     const server = createServer((request, response) => {
       void (async () => {
@@ -72,9 +81,13 @@ describe("Microsoft clients end to end", () => {
           return;
         }
         if (
-          request.url === `/v1.0/myorg/groups/${WORKSPACE_ID}/datasets/${MODEL_ID}/executeQueries`
+          request.url ===
+          `/v1.0/myorg/groups/${WORKSPACE_ID}/datasets/${MODEL_ID}/executeDaxQueries`
         ) {
-          writeJson(response, 200, { results: [{ tables: [{ rows: [{ "[Count]": 1 }] }] }] });
+          writeArrow(
+            response,
+            tableToIPC(tableFromArrays({ "[Count]": [1] }), "stream", CompressionType.LZ4_FRAME),
+          );
           return;
         }
         writeJson(response, 404, { errorCode: "NotFound" });
@@ -128,8 +141,8 @@ describe("Microsoft clients end to end", () => {
       "Bearer token-powerbi",
     ]);
     expect(JSON.parse(observed[2]?.body ?? "{}")).toEqual({
-      queries: [{ query: 'EVALUATE ROW("Count", 1)' }],
-      serializerSettings: { includeNulls: false },
+      query: 'EVALUATE ROW("Count", 1)',
+      resultSetRowCountLimit: 1_000,
     });
   });
 });

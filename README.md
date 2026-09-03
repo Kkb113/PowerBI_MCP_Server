@@ -394,9 +394,10 @@ Definitions containing unsupported or unmapped TMSL fields fail closed before mu
 lossy full-definition replacement. Desktop-only operations, PBIX extraction, XMLA/TOM/ADOMD, a TMDL
 parser, arbitrary SQL execution, and persistent credential storage are outside the service boundary.
 
-Power BI JSON DAX execution is also subject to Microsoft service limitations. Service-principal
-queries are not supported by Microsoft for semantic models with RLS or SSO enabled. The service
-applies lower configurable response limits and reports partial/truncated results explicitly.
+Power BI DAX execution uses the Arrow `executeDaxQueries` endpoint so service-principal queries can
+operate against supported modern semantic models, including models that use SSO connections. The
+service enforces a server-side row limit, applies lower configurable response limits, supports an
+optional query culture, and reports query errors and truncation explicitly.
 
 ## Additional documentation
 

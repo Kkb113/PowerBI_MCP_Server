@@ -288,9 +288,7 @@ export const TOOL_REGISTRY = [
         .trim()
         .min(2)
         .max(32)
-        .describe(
-          "Reserved for a future Arrow adapter. Omit it to use the semantic model culture with the JSON endpoint.",
-        )
+        .describe("Optional locale for DAX query parsing and formatting, such as en-US.")
         .optional(),
     }),
     annotations: readAnnotations,
@@ -309,9 +307,7 @@ export const TOOL_REGISTRY = [
         .trim()
         .min(2)
         .max(32)
-        .describe(
-          "Reserved for a future Arrow adapter. Omit it to use the semantic model culture with the JSON endpoint.",
-        )
+        .describe("Optional locale for DAX query parsing and formatting, such as en-US.")
         .optional(),
     }),
     annotations: readAnnotations,
@@ -428,10 +424,10 @@ export const RESOURCE_REGISTRY = [
 
 export const SERVER_INSTRUCTIONS = [
   "This server targets Microsoft Fabric cloud semantic models using a canonical TMSL model definition and exposes read-only Lakehouse and Warehouse inspection.",
-  "Fabric exposes lifecycle, bounded JSON DAX execution, refresh tracking, snapshots, diffs, pre-deployment checks, data-item discovery, schema inspection, and bounded table sampling through MCP.",
+  "Fabric exposes lifecycle, bounded Arrow DAX execution, refresh tracking, snapshots, diffs, pre-deployment checks, data-item discovery, schema inspection, and bounded table sampling through MCP.",
   "Workspace access is authorized by the configured Entra identity and Fabric roles; workspace IDs are discovered at runtime and are never configured as a server allowlist.",
   "Treat tool annotations as hints only. Write implementations also enforce preview-by-default, expected-definition hashes, and repeated-ID, exact-name, explicit irreversible confirmation for permanent deletion.",
   "Table sampling accepts identifiers only and executes server-generated SELECT TOP statements; arbitrary SQL is not exposed.",
-  "The JSON DAX endpoint uses the semantic model culture; it does not support per-request culture overrides.",
+  "DAX requests use the semantic model culture by default and accept an optional per-request culture.",
   "Never place credentials, access tokens, tenant secrets, or connection secrets in tool arguments.",
 ].join(" ");

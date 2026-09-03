@@ -29,6 +29,8 @@ export interface ApiRequest<T> {
   readonly path: string;
   readonly query?: Readonly<Record<string, boolean | number | string | undefined>>;
   readonly body?: unknown;
+  readonly accept?: string;
+  readonly responseType?: "json" | "bytes";
   readonly responseSchema?: z.ZodType<T>;
   readonly expectedStatuses?: readonly number[];
   readonly allowEmptyResponse?: boolean;
@@ -118,7 +120,7 @@ export class ResilientHttpClient {
         const response = await this.fetchImplementation(url, {
           method: request.method,
           headers: {
-            accept: "application/json",
+            accept: request.accept ?? "application/json",
             authorization: `Bearer ${token}`,
             ...(request.body === undefined ? {} : { "content-type": "application/json" }),
           },
@@ -234,6 +236,10 @@ export class ResilientHttpClient {
         throw this.invalidResponse(request, response, "The response body was empty.");
       }
       return undefined;
+    }
+
+    if (request.responseType === "bytes") {
+      return bytes as T;
     }
 
     if (!request.responseSchema) {

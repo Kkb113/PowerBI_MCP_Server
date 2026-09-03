@@ -3,6 +3,7 @@ import { assertWritable, ApiError } from "./errors.js";
 import type { ApiResponse } from "./http-client.js";
 import type { ResilientHttpClient } from "./http-client.js";
 import { validateUuid } from "./policy.js";
+import { parseExecuteDaxArrowResponse } from "./powerbi-arrow.js";
 import {
   executeQueriesResponseSchema,
   refreshExecutionDetailsSchema,
@@ -17,6 +18,8 @@ export const POWERBI_API_BASE_URL = "https://api.powerbi.com";
 export const executeDaxRequestSchema = z.object({
   query: z.string().trim().min(1).max(1_000_000),
   includeNulls: z.boolean().default(false),
+  maxRows: z.number().int().min(1).max(1_000_000).default(1_000),
+  culture: z.string().trim().min(2).max(32).optional(),
 });
 
 const refreshObjectSchema = z.object({
@@ -70,20 +73,54 @@ export class PowerBiClient {
     const operation = "execute_dax";
     const ids = this.datasetIds(workspaceId, semanticModelId, operation);
     const parsed = this.parseInput(executeDaxRequestSchema, request, operation);
-    const response = await this.http.request({
-      service: "powerbi",
-      operation,
-      method: "POST",
-      path: `/v1.0/myorg/groups/${ids.workspaceId}/datasets/${ids.semanticModelId}/executeQueries`,
-      body: {
-        queries: [{ query: parsed.query }],
-        serializerSettings: { includeNulls: parsed.includeNulls },
-      },
-      responseSchema: executeQueriesResponseSchema,
-      expectedStatuses: [200],
-      retryMode: "safe",
-    });
-    return this.requireData(response, operation);
+    let response: ApiResponse<Uint8Array>;
+    try {
+      response = await this.http.request<Uint8Array>({
+        service: "powerbi",
+        operation,
+        method: "POST",
+        path: `/v1.0/myorg/groups/${ids.workspaceId}/datasets/${ids.semanticModelId}/executeDaxQueries`,
+        body: {
+          query: parsed.query,
+          resultSetRowCountLimit: parsed.maxRows,
+          ...(parsed.culture === undefined ? {} : { culture: parsed.culture }),
+        },
+        accept: "application/vnd.apache.arrow.stream",
+        responseType: "bytes",
+        expectedStatuses: [200],
+        retryMode: "safe",
+      });
+    } catch (error: unknown) {
+      if (error instanceof ApiError && error.httpStatus === 404) {
+        throw new ApiError(
+          "SEMANTIC_MODEL_NOT_FOUND",
+          "The semantic model was not found in the requested workspace. List semantic models again and use a current model ID; deleted model IDs cannot be queried.",
+          {
+            service: "powerbi",
+            operation,
+            httpStatus: error.httpStatus,
+            ...(error.requestId === undefined ? {} : { requestId: error.requestId }),
+            ...(error.serviceCode === undefined ? {} : { serviceCode: error.serviceCode }),
+            cause: error,
+          },
+        );
+      }
+      throw error;
+    }
+    const bytes = this.requireData(response, operation);
+    try {
+      return executeQueriesResponseSchema.parse(
+        parseExecuteDaxArrowResponse(bytes, parsed.includeNulls),
+      );
+    } catch (error: unknown) {
+      throw new ApiError("INVALID_API_RESPONSE", "Power BI returned an invalid Arrow response.", {
+        service: "powerbi",
+        operation,
+        httpStatus: response.status,
+        ...(response.requestId === undefined ? {} : { requestId: response.requestId }),
+        cause: error,
+      });
+    }
   }
 
   public async startRefresh(

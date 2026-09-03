@@ -1,6 +1,6 @@
 {
   "name": "fabric-semantic-model-mcp",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "description": "Remote MCP server for Microsoft Fabric semantic model lifecycle management",
   "type": "module",
@@ -34,14 +34,17 @@
     "@modelcontextprotocol/express": "2.0.0",
     "@modelcontextprotocol/node": "2.0.0",
     "@modelcontextprotocol/server": "2.0.0",
+    "apache-arrow": "21.2.0",
     "express": "5.2.1",
     "jose": "6.2.10",
+    "lz4js": "0.2.0",
     "tedious": "20.0.0",
     "zod": "4.5.4"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "2.0.0",
     "@types/express": "5.0.6",
+    "@types/lz4js": "0.2.2",
     "@types/node": "24.13.3",
     "@vitest/coverage-v8": "4.1.11",
     "eslint": "10.9.1",

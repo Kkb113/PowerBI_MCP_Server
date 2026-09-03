@@ -34,7 +34,8 @@ Direct Lake on OneLake is represented by one shared named M expression that poin
 workspace and item path. Every entity partition references that expression through
 `expressionSource`; it does not reference a structured TDS data source. Query partitions continue
 to reference structured data sources through `dataSourceName`. Validation and dependency checks
-enforce these distinct contracts before any definition reaches Fabric.
+enforce these distinct contracts before any definition reaches Fabric. The optional `schemaName`
+is emitted only when supplied; callers must omit it for non-schema-enabled Lakehouses.
 
 Collections with set semantics are normalized by case-insensitive name. Hierarchy-level and
 calculation-item order is preserved. DAX and M line endings are normalized to LF. Object keys are

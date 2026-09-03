@@ -386,7 +386,9 @@ For Direct Lake on OneLake, define a shared named M expression with
 `AzureStorage.DataLake("https://onelake.dfs.fabric.microsoft.com/<workspace-id>/<item-id>",
 [HierarchicalNavigation=true])` and set each entity partition's `expressionSource` to that expression
 name. Entity partitions must not reference a structured TDS data source. Import and DirectQuery
-query partitions use `dataSourceName` when structured data-source metadata is required.
+query partitions use `dataSourceName` when structured data-source metadata is required. Include
+`schemaName` only for schema-enabled Lakehouses; omit it for Lakehouses whose item properties do not
+publish `defaultSchema`.
 
 Definitions containing unsupported or unmapped TMSL fields fail closed before mutation to prevent
 lossy full-definition replacement. Desktop-only operations, PBIX extraction, XMLA/TOM/ADOMD, a TMDL

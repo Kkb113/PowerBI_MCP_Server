@@ -54,6 +54,26 @@ describe("TMSL ModelSpec codec", () => {
     expect(directLakeSource).not.toHaveProperty("dataSource");
   });
 
+  it("omits schemaName for a non-schema-enabled Direct Lake source", () => {
+    const model = loadModelFixture();
+    const partition = model.tables
+      .find((table) => table.name === "Product")!
+      .partitions.find((candidate) => candidate.kind === "entity")!;
+    if (partition.kind !== "entity") throw new Error("Expected an entity partition fixture.");
+    delete partition.schemaName;
+
+    const source = modelSpecToBim(model)
+      .model.tables.find((table) => table.name === "Product")!
+      .partitions.find((candidate) => candidate.source.type === "entity")!.source;
+
+    expect(source).toMatchObject({
+      type: "entity",
+      entityName: "DimProduct",
+      expressionSource: "Parameter – Server",
+    });
+    expect(source).not.toHaveProperty("schemaName");
+  });
+
   it("builds deterministic Fabric definition parts and parses them", () => {
     const model = loadModelFixture();
     const definition = buildTmslDefinition(model);

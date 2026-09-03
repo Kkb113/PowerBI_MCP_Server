@@ -115,7 +115,7 @@ const createDirectLakeModel = (
   workspaceId: string,
   lakehouseId: string,
   tableName: string,
-  schemaName: string,
+  schemaName: string | undefined,
   sourceColumns: readonly SourceColumn[],
 ): ModelSpec => {
   const columns = sourceColumns
@@ -177,7 +177,7 @@ const createDirectLakeModel = (
             mode: "directLake",
             expressionSource: expressionName,
             entityName: tableName,
-            schemaName,
+            ...(schemaName === undefined ? {} : { schemaName }),
             annotations: [],
           },
         ],
@@ -268,6 +268,12 @@ async function main(): Promise<void> {
     if (lakehouse.data?.["id"] !== lakehouseId) {
       throw new Error("The configured Lakehouse was not resolved through MCP.");
     }
+    const lakehouseProperties = lakehouse.data?.["properties"];
+    const schemaEnabled =
+      lakehouseProperties !== null &&
+      typeof lakehouseProperties === "object" &&
+      !Array.isArray(lakehouseProperties) &&
+      typeof lakehouseProperties["defaultSchema"] === "string";
     const schema = await call("inspect_data_source_schema", {
       workspaceId,
       itemType: "lakehouse",
@@ -280,7 +286,7 @@ async function main(): Promise<void> {
     if (schemaNames.size !== 1) {
       throw new Error("The configured Lakehouse table resolved to more than one SQL schema.");
     }
-    const schemaName = [...schemaNames][0]!;
+    const schemaName = schemaEnabled ? [...schemaNames][0]! : undefined;
     const model = createDirectLakeModel(
       workspaceId,
       lakehouseId,

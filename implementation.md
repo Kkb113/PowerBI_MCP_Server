@@ -1,6 +1,7 @@
 # TypeScript Fabric Semantic Model MCP Server — Six-Phase Implementation Plan
 
-> Status: Phases 1-5 implemented on 2026-09-03. Phase 6 remains planned and is not implemented.
+> Status: Phases 1-6 implemented on 2026-09-03. Release candidate `0.1.0-rc.1` is prepared for
+> Render testing; hosted deployment remains a separate, explicitly approved activity.
 >
 > Research date: 2026-09-02
 
@@ -443,6 +444,12 @@ Expose the completed lifecycle through useful MCP tools and prove that a deploye
 
 ### Phase 6 — End-to-end verification and release candidate
 
+**Implementation status:** Complete. The release candidate includes a pinned multi-stage non-root
+container, production-only dependencies, safe-by-default Render Blueprint, Azure Container Apps
+runbook, container CI gate, exact test-evidence matrix, and an MCP-driven disposable lifecycle that
+runs twice with verified permanent cleanup. See [`docs/test-evidence.md`](./docs/test-evidence.md)
+and [`docs/adr/0005-reproducible-release-container.md`](./docs/adr/0005-reproducible-release-container.md).
+
 #### Objective
 
 Produce a reproducible container and evidence that all promised behavior is ready for Render testing.
@@ -594,11 +601,18 @@ Deployment is intentionally outside the six implementation phases. Phase 6 only 
 - [Refresh a semantic model](https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/refresh-dataset-in-group)
 - [Get semantic model refresh history](https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/get-refresh-history-in-group)
 - [Inspect refresh execution](https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/get-refresh-execution-details-in-group)
+- [Docker multi-stage builds](https://docs.docker.com/build/building/multi-stage/)
+- [Official Node.js Docker image best practices](https://github.com/nodejs/docker-node/blob/main/docs/BestPractices.md)
 - [Render Web Services](https://render.com/docs/web-services)
+- [Render Docker services](https://render.com/docs/docker)
+- [Render Blueprint YAML reference](https://render.com/docs/blueprint-spec)
+- [Render health checks](https://render.com/docs/health-checks)
 - [Render free-service limitations](https://render.com/docs/free)
 - [Azure Container Apps overview](https://learn.microsoft.com/en-us/azure/container-apps/overview)
 - [Azure Container Apps ingress](https://learn.microsoft.com/en-us/azure/container-apps/ingress-overview)
 - [Managed identities in Azure Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/managed-identity)
+- [Health probes in Azure Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/health-probes)
+- [Secrets in Azure Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/manage-secrets)
 - [Authentication in Azure Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/authentication)
 
 ## 15. Final planning decision

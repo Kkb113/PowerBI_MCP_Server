@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: fabric-semantic-model-mcp
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    maxShutdownDelaySeconds: 30
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: LOG_LEVEL
+        value: info
+      - key: AZURE_AUTH_MODE
+        value: client-secret
+      - key: POWERBI_MCP_READONLY
+        value: "true"
+      - key: HTTP_TIMEOUT_MS
+        value: "30000"
+      - key: HTTP_MAX_RETRIES
+        value: "2"
+      - key: HTTP_MAX_PAGES
+        value: "100"
+      - key: HTTP_MAX_RESPONSE_BYTES
+        value: "10485760"
+      - key: LRO_POLL_BUDGET_MS
+        value: "60000"
+      - key: DAX_MAX_ROWS
+        value: "1000"
+      - key: DAX_MAX_RESPONSE_BYTES
+        value: "1048576"
+      - key: MCP_API_KEY
+        sync: false
+      - key: AZURE_TENANT_ID
+        sync: false
+      - key: AZURE_CLIENT_ID
+        sync: false
+      - key: AZURE_CLIENT_SECRET
+        sync: false
+      - key: FABRIC_ALLOWED_WORKSPACE_IDS
+        sync: false

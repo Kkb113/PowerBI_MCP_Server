@@ -32,3 +32,25 @@ jobs:
 
       - name: Run format, lint, types, tests, coverage, and build
         run: npm run check
+
+  container:
+    name: Production container gate
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Build and verify the production container
+        run: npm run test:container

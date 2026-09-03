@@ -313,7 +313,12 @@ export class McpWorkflowService implements McpToolHandler {
         const input = parseToolInput(name, rawInput);
         return successExecution(
           "Semantic models listed.",
-          await this.semanticModels.listSemanticModels(input.workspaceId, input),
+          await this.semanticModels.listSemanticModels(input.workspaceId, {
+            limit: input.limit,
+            ...(input.continuationToken === undefined
+              ? {}
+              : { continuationToken: input.continuationToken }),
+          }),
         );
       }
       case "get_semantic_model": {

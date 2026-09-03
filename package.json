@@ -1,6 +1,6 @@
 {
   "name": "fabric-semantic-model-mcp",
-  "version": "0.1.0",
+  "version": "0.1.0-rc.1",
   "private": true,
   "description": "Remote MCP server for Microsoft Fabric semantic model lifecycle management",
   "type": "module",
@@ -18,10 +18,12 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "test:container": "tsx scripts/container-smoke.ts",
     "test:e2e": "vitest run tests/e2e",
     "test:live": "tsx scripts/live-smoke.ts",
     "test:live:phase4": "tsx scripts/live-phase4.ts",
     "test:live:phase5": "tsx scripts/live-phase5.ts",
+    "test:live:phase6": "tsx scripts/live-phase6.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -53,10 +53,11 @@ const createHarness = (
 ) => {
   const listWorkspaces = vi.fn().mockResolvedValue({ value: [] });
   const createSemanticModel = vi.fn().mockResolvedValue({ status: "preview", applied: false });
+  const listSemanticModels = vi.fn().mockResolvedValue({ value: [] });
   const getSnapshot = vi.fn().mockResolvedValue({ status: "completed", snapshot });
   const semanticModels = {
     listWorkspaces,
-    listSemanticModels: vi.fn().mockResolvedValue({ value: [] }),
+    listSemanticModels,
     getSemanticModel: vi.fn().mockResolvedValue(snapshot.item),
     getSnapshot,
     getModelInfo: vi.fn().mockResolvedValue({ status: "completed", summary: snapshot.summary }),
@@ -96,7 +97,7 @@ const createHarness = (
   } as unknown as Pick<PowerBiClient, "executeDax" | "startRefresh" | "getRefreshExecutionDetails">;
   return {
     semanticModels,
-    semanticModelMocks: { listWorkspaces, createSemanticModel, getSnapshot },
+    semanticModelMocks: { listWorkspaces, listSemanticModels, createSemanticModel, getSnapshot },
     fabric,
     powerBi,
     powerBiMocks: { executeDax, startRefresh, getRefreshExecutionDetails },
@@ -127,6 +128,17 @@ describe("McpWorkflowService", () => {
     await expect(service.execute("list_workspaces", {})).resolves.toMatchObject({
       status: "success",
       data: { value: [] },
+    });
+    await expect(
+      service.execute("list_semantic_models", {
+        workspaceId: WORKSPACE_ID,
+        limit: 25,
+        continuationToken: "next-page",
+      }),
+    ).resolves.toMatchObject({ status: "success", data: { value: [] } });
+    expect(semanticModelMocks.listSemanticModels).toHaveBeenCalledWith(WORKSPACE_ID, {
+      limit: 25,
+      continuationToken: "next-page",
     });
     await expect(
       service.execute("get_semantic_model", {

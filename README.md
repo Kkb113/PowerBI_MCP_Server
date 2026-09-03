@@ -6,10 +6,11 @@ project is implemented in strict TypeScript and follows the six-phase plan in
 
 ## Current status
 
-Phases 1 through 5 are implemented. All 18 frozen MCP tools now use the tested Microsoft clients,
+Phases 1 through 6 are implemented. All 18 frozen MCP tools use the tested Microsoft clients,
 semantic-model lifecycle service, deterministic model engine, bounded JSON DAX execution, refresh
-tracking, snapshots, diffs, and pre-deployment checks. Phase 6 container and release-candidate work
-remains.
+tracking, snapshots, diffs, and pre-deployment checks. Release candidate `0.1.0-rc.1` adds a pinned,
+non-root production container, Render configuration, Azure deployment guidance, container CI, and
+twice-through live verification.
 
 Available now:
 
@@ -47,11 +48,15 @@ Available now:
 - Preview-first transactional refresh start plus resumable terminal-status diagnostics.
 - Normalized model snapshots, operation-aware diffs, and configurable pre-deployment checks.
 - Response-boundary secret redaction and centralized read-only enforcement before applied workflows.
+- A multi-stage Node.js 24.14.0 Debian-slim image containing production dependencies only.
+- Automated non-root, read-only-filesystem, health, MCP, restart, logging, and SIGTERM checks.
+- A safe-by-default Render Blueprint and an Azure Container Apps operating runbook.
 
 ## Requirements
 
 - Node.js 24.14.0
 - npm 11.9.0
+- Docker Engine with Linux container support for the container release gate
 
 The exact Node version is recorded in `.nvmrc` and `.node-version`. Runtime and development
 dependency versions are exact and committed in `package-lock.json`.
@@ -105,6 +110,17 @@ audience-specific bearer tokens, request serialization, response parsing, and al
 model pipeline test validates a golden TMSL definition, applies a multi-object atomic batch,
 serializes it into Fabric definition parts, reads it back, and verifies an identical semantic hash.
 
+Build and exercise the production image:
+
+```powershell
+npm run test:container
+```
+
+This verifies the exact Node runtime, non-root execution, production-only dependencies, read-only
+filesystem compatibility, probes, unauthenticated rejection, authenticated MCP discovery, restart
+recovery, secret-free logs, and graceful shutdown. Docker is intentionally a separate release gate
+so ordinary unit development does not require a local daemon.
+
 An opt-in live smoke check performs only workspace and semantic-model reads:
 
 ```powershell
@@ -147,6 +163,21 @@ npm run test:live:phase5
 It requires exactly one allowlisted development workspace. Cleanup runs in `finally`, with a direct
 Fabric fallback if the MCP connection is unavailable.
 
+The Phase 6 release-candidate check runs a complete disposable lifecycle twice. In addition to the
+Phase 5 workflow, it verifies item property updates, representative measure and hierarchy CRUD,
+optimistic-concurrency rejection, definition readback, and post-delete absence:
+
+```powershell
+$env:PHASE6_LIVE_MUTATION = "true"
+$env:PHASE6_LIVE_PERMANENT_DELETE = "true"
+$env:POWERBI_MCP_READONLY = "false"
+npm run test:live:phase6
+```
+
+It is intentionally fixed at two sequential runs and requires exactly one allowlisted development
+workspace. See [`docs/test-evidence.md`](./docs/test-evidence.md) for the complete release gate and
+recorded results.
+
 ## Configuration
 
 | Variable                       |    Required | Default        | Description                                                                      |
@@ -175,6 +206,14 @@ Fabric fallback if the MCP connection is unavailable.
 
 Configuration is validated before the server binds a port. Error messages name invalid variables
 but never include their values.
+
+## Deployment
+
+The production container is prepared for Render but Phase 6 does not deploy it. The root
+[`render.yaml`](./render.yaml) starts in read-only mode and prompts for every credential or
+tenant-specific value. [`docs/deployment.md`](./docs/deployment.md) gives the full Render procedure,
+health checks, rollback steps, and the later Azure Container Apps configuration using the same
+image.
 
 ## Frozen Phase 1 contract
 
